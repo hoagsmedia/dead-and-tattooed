@@ -1,5 +1,9 @@
+<script>
+	import Brand from './Components/Brand.svelte';
+</script>
+
 <div class="w-1/2">
-	<img src="/brand.svg" alt="logo" />
+	<Brand />
 </div>
 <div class="my-4 w-1/2">
 	<a
@@ -14,7 +18,6 @@
 <h2 class="text-xl font-bold">Just a guy who stabs dead things</h2>
 <article class="prose text-center">
 	<p>Come check out my store.</p>
-	<!-- ... -->
 </article>
 
 <style lang="postcss">
