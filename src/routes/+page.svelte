@@ -1,9 +1,10 @@
 <script>
 	import Brand from './Components/Brand.svelte';
+	import BrandOutlines from './Components/Brand-Outlines.svelte';
 </script>
 
 <div class="w-1/2">
-	<Brand />
+	<BrandOutlines />
 </div>
 <div class="my-4 w-1/2">
 	<a
