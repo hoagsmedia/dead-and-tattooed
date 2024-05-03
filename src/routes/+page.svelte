@@ -1,4 +1,4 @@
-<img src="/deadandtattooed.png" width="50%" alt="logo" />
+<img src="/brand.svg" width="50%" alt="logo" />
 <div class="my-4 w-1/2">
 	<a
 		class=" transition ease-in-out btn bg-black hover:bg-gray-800 hover:drop-shadow-lg hover:scale-105 text-white w-full"
