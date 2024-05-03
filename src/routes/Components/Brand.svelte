@@ -12,13 +12,13 @@
 			}
 			@keyframes float {
 				0% {
-					transform: translateY(0) rotate(0deg);
+					transform: translateY(-10) rotate(0deg);
 				}
 				50% {
-					transform: translateY(-3px) rotate(-1deg);
+					transform: translateY(5px) rotate(-1deg);
 				}
 				100% {
-					transform: translateY(0) rotate(0deg);
+					transform: translateY(-10) rotate(0deg);
 				}
 			}
 			.cls-1 {
