@@ -1,5 +1,5 @@
 <script>
-	import Brand from './Components/Brand.svelte';
+	// import Brand from './Components/Brand.svelte';
 	import BrandOutlines from './Components/Brand-Outlines.svelte';
 </script>
 
