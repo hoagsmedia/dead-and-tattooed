@@ -13,7 +13,7 @@
 	<!-- CTA Section -->
 	<div class="w-full max-w-sm space-y-6 animate-slide-up animation-delay-200">
 		<Button
-			class="group relative w-full h-12 text-white font-semibold rounded-lg overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] bg-linear-[45deg,#f09433_0%,#e6683c_25%,#dc2743_50%,#cc2366_75%,#bc1888_100%]"
+			class="group relative w-full h-12 text-white font-semibold rounded-lg overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] bg-linear-65 from-[#f09433] from-0% via-[#e6683c] via-25% to-[#bc1888] to-90%"
 			variant="default"
 			disabled={false}
 			target="_blank"
