@@ -8,7 +8,7 @@
 </div>
 <div class="my-4 w-1/2">
 	<a
-		class="transition ease-in-out btn hover:drop-shadow-lg hover:scale-105 text-white w-full font-semibold rounded-lg"
+		class="transition ease-in-out hover:drop-shadow-lg hover:scale-105 text-white w-full font-semibold rounded-lg"
 		style="background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);"
 		target="_blank"
 		href="https://www.instagram.com/deadandtattooed/"
