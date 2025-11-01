@@ -38,18 +38,28 @@
 	type ButtonVariant = 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link';
 	type ButtonSize = 'default' | 'sm' | 'lg' | 'icon' | 'icon-sm' | 'icon-lg';
 
-	type ButtonProps = {
-		class?: string;
-		variant?: ButtonVariant;
-		size?: ButtonSize;
-		ref?: HTMLAnchorElement | HTMLButtonElement | null;
-		href?: string;
-		type?: 'button' | 'submit' | 'reset';
-		disabled?: boolean;
-		children?: Snippet;
-	} & (Omit<HTMLAnchorAttributes, 'href' | 'disabled'> & { href?: string }) &
-		(Omit<HTMLButtonAttributes, 'type' | 'disabled'> & { type?: 'button' | 'submit' | 'reset' });
-
+	type ButtonProps =
+		// Anchor variant: href is present, so use anchor attributes (no type, no disabled)
+		({
+			class?: string;
+			variant?: ButtonVariant;
+			size?: ButtonSize;
+			ref?: HTMLAnchorElement | null;
+			href: string;
+			disabled?: boolean;
+			children?: Snippet;
+		} & Omit<HTMLAnchorAttributes, 'href' | 'disabled'>)
+		|
+		// Button variant: href is absent, so use button attributes (no href)
+		({
+			class?: string;
+			variant?: ButtonVariant;
+			size?: ButtonSize;
+			ref?: HTMLButtonElement | null;
+			type?: 'button' | 'submit' | 'reset';
+			disabled?: boolean;
+			children?: Snippet;
+		} & Omit<HTMLButtonAttributes, 'type' | 'disabled'>);
 	let {
 		class: className,
 		variant = 'default' as ButtonVariant,
