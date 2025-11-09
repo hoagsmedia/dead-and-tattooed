@@ -1,18 +1,11 @@
 <script lang="ts">
 	import type { PageData } from './$types.js';
+	import { formatPrice } from '$lib/utils';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { ShoppingCart } from '@lucide/svelte';
 
 	let { data }: { data: PageData } = $props();
-
-	function formatPrice(amount: number | null, currency: string): string {
-		if (!amount) return 'Price not available';
-		return new Intl.NumberFormat('en-US', {
-			style: 'currency',
-			currency: currency.toUpperCase()
-		}).format(amount / 100);
-	}
 </script>
 
 <div class="container mx-auto px-4 py-8">
@@ -30,14 +23,10 @@
 	{:else}
 		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 			{#each data.products as product}
-				<Card.Root class="flex flex-col">
+				<Card.Root class="flex flex-col pt-0">
 					{#if product.images && product.images.length > 0}
 						<div class="aspect-video w-full overflow-hidden rounded-t-lg">
-							<img
-								src={product.images[0]}
-								alt={product.name}
-								class="w-full h-full object-cover"
-							/>
+							<img src={product.images[0]} alt={product.name} class="w-full h-full object-cover" />
 						</div>
 					{/if}
 					<Card.Header>
@@ -81,4 +70,3 @@
 		</div>
 	{/if}
 </div>
-
