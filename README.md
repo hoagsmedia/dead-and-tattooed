@@ -1,38 +1,51 @@
-# create-svelte
+# 🐷 Dead & Tattooed
 
-Everything you need to build a Svelte project, powered by [`create-svelte`](https://github.com/sveltejs/kit/tree/main/packages/create-svelte).
+Dead & Tattooed is an e-commerce web app built for a tattoo artist who sells preserved tattoo art pieces.  
+Each piece is a one-of-a-kind specimen — tattooed pig’s feet sealed in jars and sold as collectible artwork.  
+The goal is to move away from Etsy’s high fees and create a standalone, secure storefront with full creative control.
 
-## Creating a project
+---
 
-If you're seeing this, you've probably already done this step. Congrats!
+## 🧰 Tech Stack
 
-```bash
-# create a new project in the current directory
-pnpm create svelte@latest
+- **Framework:** Svelte 5 + TypeScript
+- **UI:** Tailwind CSS 4 + shadcn-svelte
+- **Database:** PostgreSQL (Neon) + Drizzle ORM
+- **Auth:** Better Auth
+- **Payments:** Stripe
+- **Validation:** Zod 4
+- **Package Manager:** pnpm
 
-# create a new project in my-app
-pnpm create svelte@latest my-app
-```
+---
 
-## Developing
+## 🗺️ Roadmap
 
-Once you've created a project and installed dependencies with `pnpm install`, start a development server:
+### ✅ Completed
 
-```bash
-pnpm run dev
+- [x] Project setup (Svelte 5 + Tailwind 4 + pnpm)
+- [x] Stripe integration for product checkout
+- [x] Drizzle ORM schema setup and Neon database connection
+- [x] Basic product seeding (3 sample art pieces)
+- [x] Auth with Better Auth (admin-only access for now)
 
-# or start the server and open the app in a new browser tab
-pnpm run dev -- --open
-```
+### 🚧 In Progress
 
-## Building
+- [ ] Admin dashboard (add/edit/delete products)
+- [ ] File uploads for product images (S3 or R2)
+- [ ] Stripe webhook handling for order fulfillment
+- [ ] Order and inventory management views
 
-To create a production version of your app:
+### 🧩 Future Features
 
-```bash
-pnpm run build
-```
+- [ ] Customer accounts and order history
+- [ ] Email notifications for orders
+- [ ] Scheduled “drop” feature for limited releases
+- [ ] Custom product photo storage integration
+- [ ] Client portal and analytics dashboard
 
-You can preview the production build with `pnpm run preview`.
+---
 
-> To deploy your app, you may need to install an [adapter](https://kit.svelte.dev/docs/adapters) for your target environment.
+## 🖋️ Author
+
+Built by [Josh](https://github.com/) for his friend’s growing tattoo art business.  
+Real ink. Real preservation. Real weird.
