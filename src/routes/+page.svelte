@@ -1,6 +1,6 @@
 <script lang="ts">
 	import BrandOutlines from './Components/Brand-Outlines.svelte';
-	import { Button } from '$lib/components/ui/button/index';
+	import { Button } from '$lib/components/ui/button/index.js';
 	import { Instagram } from '@lucide/svelte';
 </script>
 
