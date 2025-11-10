@@ -10,11 +10,7 @@
 </script>
 
 <div class="container mx-auto px-4 py-8">
-	<Button
-		variant="ghost"
-		class="mb-6"
-		onclick={() => goto('/products')}
-	>
+	<Button variant="ghost" class="mb-6" onclick={() => goto('/products')}>
 		<ArrowLeft class="mr-2 size-4" />
 		Back to Products
 	</Button>
@@ -23,7 +19,9 @@
 		<!-- Product Images -->
 		<div class="space-y-4">
 			{#if data.product.images && data.product.images.length > 0}
-				<div class="aspect-square w-full overflow-hidden rounded-lg border bg-muted flex items-center justify-center">
+				<div
+					class="aspect-square w-full overflow-hidden rounded-lg border bg-muted flex items-center justify-center"
+				>
 					<img
 						src={data.product.images[0]}
 						alt={data.product.name}
@@ -33,7 +31,9 @@
 				{#if data.product.images.length > 1}
 					<div class="grid grid-cols-4 gap-4">
 						{#each data.product.images.slice(1, 5) as image, index}
-							<div class="aspect-square overflow-hidden rounded-lg border bg-muted flex items-center justify-center">
+							<div
+								class="aspect-square overflow-hidden rounded-lg border bg-muted flex items-center justify-center"
+							>
 								<img
 									src={image}
 									alt={`${data.product.name} - Image ${index + 2}`}
@@ -44,7 +44,9 @@
 					</div>
 				{/if}
 			{:else}
-				<div class="aspect-square w-full flex items-center justify-center bg-muted rounded-lg border">
+				<div
+					class="aspect-square w-full flex items-center justify-center bg-muted rounded-lg border"
+				>
 					<p class="text-muted-foreground">No image available</p>
 				</div>
 			{/if}
@@ -84,6 +86,7 @@
 										<p class="text-sm text-muted-foreground">One-time payment</p>
 									{/if}
 								</div>
+								<!-- TODO: Implement shopping cart functionality (DEA-8) -->
 								<Button variant="default" size="lg">
 									<ShoppingCart class="mr-2 size-4" />
 									Add to Cart
@@ -121,4 +124,3 @@
 		</div>
 	</div>
 </div>
-

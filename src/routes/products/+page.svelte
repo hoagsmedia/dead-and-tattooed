@@ -3,7 +3,6 @@
 	import { formatPrice } from '$lib/utils';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import { ShoppingCart } from '@lucide/svelte';
 
 	let { data }: { data: PageData } = $props();
 </script>
