@@ -1,9 +1,8 @@
 <script lang="ts">
 	import '../app.css';
 	import { injectAnalytics } from '@vercel/analytics/sveltekit';
-	import Navbar from '$lib/components/navbar.svelte';
 	import type { LayoutData } from './$types.js';
-
+	import Navbar from '$lib/components/navbar.svelte';
 	injectAnalytics();
 
 	let { data, children }: { data: LayoutData; children: any } = $props();

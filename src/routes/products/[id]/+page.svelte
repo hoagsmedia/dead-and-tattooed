@@ -3,10 +3,29 @@
 	import { formatPrice } from '$lib/utils.js';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import { ShoppingCart, ArrowLeft } from '@lucide/svelte';
+	import { ShoppingCart, ArrowLeft, Check } from '@lucide/svelte';
 	import { goto } from '$app/navigation';
+	import { cart } from '$lib/stores/cart.svelte.js';
 
 	let { data }: { data: PageData } = $props();
+
+	function handleAddToCart(price: (typeof data.product.prices)[0]) {
+		cart.addItem({
+			productId: data.product.id,
+			priceId: price.id,
+			name: data.product.name,
+			image: data.product.images?.[0] || null,
+			price: price.amount || 0,
+			currency: price.currency,
+			recurring: price.recurring
+		});
+	}
+
+	function isInCart() {
+		// Check if product is already in cart (one-of-a-kind products)
+		// Access cart.items to ensure reactivity
+		return cart.items.some((item) => item.productId === data.product.id);
+	}
 </script>
 
 <div class="container mx-auto px-4 py-8">
@@ -86,11 +105,17 @@
 										<p class="text-sm text-muted-foreground">One-time payment</p>
 									{/if}
 								</div>
-								<!-- TODO: Implement shopping cart functionality (DEA-8) -->
-								<Button variant="default" size="lg">
-									<ShoppingCart class="mr-2 size-4" />
-									Add to Cart
-								</Button>
+								{#if isInCart()}
+									<Button variant="outline" size="lg" disabled>
+										<Check class="mr-2 size-4" />
+										In Cart
+									</Button>
+								{:else}
+									<Button variant="default" size="lg" onclick={() => handleAddToCart(price)}>
+										<ShoppingCart class="mr-2 size-4" />
+										Add to Cart
+									</Button>
+								{/if}
 							</div>
 						{/each}
 					</Card.Content>

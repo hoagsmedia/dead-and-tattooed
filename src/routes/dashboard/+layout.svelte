@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { authClient } from '$lib/auth-client';
-	import { Button } from '$lib/components/ui/button/index.js';
 	import type { LayoutData } from './$types';
+	import { authClient } from '$lib/auth-client';
 	import { goto } from '$app/navigation';
+	import { Button } from '$lib/components/ui/button/index.js';
 
 	let { data, children }: { data: LayoutData; children: import('svelte').Snippet } = $props();
 	const session = authClient.useSession();
