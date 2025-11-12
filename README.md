@@ -47,5 +47,5 @@ The goal is to move away from Etsy’s high fees and create a standalone, secure
 
 ## 🖋️ Author
 
-Built by [Josh](https://github.com/) for his friend’s growing tattoo art business.  
+Built by [Josh](https://github.com/)   
 Real ink. Real preservation. Real weird.
