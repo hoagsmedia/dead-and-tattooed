@@ -83,7 +83,14 @@
 			</div>
 
 			<!-- Pricing -->
-			{#if data.product.prices.length > 0}
+			{#if data.product.sold}
+				<Card.Root>
+					<Card.Content class="py-8 text-center">
+						<p class="text-lg font-medium">Sold</p>
+						<p class="text-muted-foreground mt-1">This one-of-a-kind piece is no longer available.</p>
+					</Card.Content>
+				</Card.Root>
+			{:else if data.product.prices.length > 0}
 				<Card.Root>
 					<Card.Header>
 						<Card.Title>Pricing</Card.Title>
@@ -129,14 +136,14 @@
 			{/if}
 
 			<!-- Metadata -->
-			{#if data.product.metadata && Object.keys(data.product.metadata).length > 0}
+			{#if data.product.metadata && Object.keys(data.product.metadata).filter((k) => k !== 'sold' && k !== 'soldAt').length > 0}
 				<Card.Root>
 					<Card.Header>
 						<Card.Title>Additional Information</Card.Title>
 					</Card.Header>
 					<Card.Content>
 						<dl class="space-y-2">
-							{#each Object.entries(data.product.metadata) as [key, value]}
+							{#each Object.entries(data.product.metadata).filter(([key]) => key !== 'sold' && key !== 'soldAt') as [key, value]}
 								<div class="flex justify-between">
 									<dt class="font-medium capitalize">{key.replace(/_/g, ' ')}:</dt>
 									<dd class="text-muted-foreground">{value}</dd>

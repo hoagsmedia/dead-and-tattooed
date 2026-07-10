@@ -3,7 +3,8 @@ import type { RequestHandler } from './$types.js';
 import { stripe } from '$lib/stripe.js';
 import { env } from '$env/dynamic/private';
 import { db } from '$lib/index.js';
-import { order } from '../../../../db/schema.js';
+import { order, orderItem } from '../../../../db/schema.js';
+import { markProductsSold } from '$lib/inventory.js';
 import { eq } from 'drizzle-orm';
 
 /**
@@ -61,7 +62,7 @@ export const POST: RequestHandler = async ({ request }) => {
 			console.log('Payment intent succeeded:', paymentIntent.id);
 			// Update order status to completed if it exists
 			try {
-				const result = await db
+				await db
 					.update(order)
 					.set({ status: 'completed' })
 					.where(eq(order.paymentIntentId, paymentIntent.id));
@@ -69,6 +70,44 @@ export const POST: RequestHandler = async ({ request }) => {
 			} catch (err) {
 				console.error('Error updating order status:', err);
 				// Don't fail the webhook - order might not exist yet if webhook fires before form submission
+			}
+
+			// Mark one-of-a-kind pieces sold (Stripe inactive + local artwork unpublished when linked)
+			try {
+				const productIds = new Set<string>();
+
+				if (paymentIntent.metadata?.cartItems) {
+					try {
+						const cartItems = JSON.parse(paymentIntent.metadata.cartItems) as Array<{
+							productId?: string;
+						}>;
+						for (const item of cartItems) {
+							if (item.productId) productIds.add(item.productId);
+						}
+					} catch (e) {
+						console.error('Failed to parse cartItems metadata in webhook:', e);
+					}
+				}
+
+				const orderRows = await db
+					.select({ id: order.id })
+					.from(order)
+					.where(eq(order.paymentIntentId, paymentIntent.id))
+					.limit(1);
+
+				if (orderRows[0]) {
+					const items = await db
+						.select({ productId: orderItem.productId })
+						.from(orderItem)
+						.where(eq(orderItem.orderId, orderRows[0].id));
+					for (const item of items) productIds.add(item.productId);
+				}
+
+				if (productIds.size > 0) {
+					await markProductsSold([...productIds]);
+				}
+			} catch (err) {
+				console.error('Failed to mark products sold in webhook:', err);
 			}
 			break;
 		}
