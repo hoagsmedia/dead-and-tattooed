@@ -77,11 +77,19 @@
 									Not for sale
 								{/if}
 								<br />
-								<span class="inline-flex items-center px-2 py-1 rounded-full text-xs {artwork.published
-									? 'bg-green-100 text-green-800'
-									: 'bg-gray-100 text-gray-800'}">
-									{artwork.published ? 'Published' : 'Draft'}
-								</span>
+								{#if artwork.availability === 'sold'}
+									<span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-red-100 text-red-800">
+										Sold
+									</span>
+								{:else if artwork.availability === 'available'}
+									<span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">
+										Available
+									</span>
+								{:else}
+									<span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-800">
+										Draft
+									</span>
+								{/if}
 							</Card.Description>
 						</Card.Header>
 						<Card.Content>

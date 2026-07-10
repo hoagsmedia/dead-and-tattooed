@@ -1,7 +1,7 @@
 import { fail, redirect } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
 import { db } from '$lib/index';
-import { artwork } from '../../db/schema';
+import { artwork, order, orderItem } from '../../db/schema';
 import { eq } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 
@@ -17,8 +17,28 @@ export const load: PageServerLoad = async ({ locals }) => {
 		.where(eq(artwork.userId, locals.user.id))
 		.orderBy(artwork.createdAt);
 
+	const artworkIds = artworks.map((a) => a.id);
+	const soldIds = new Set<string>();
+
+	if (artworkIds.length > 0) {
+		const soldRows = await db
+			.select({ productId: orderItem.productId })
+			.from(orderItem)
+			.innerJoin(order, eq(orderItem.orderId, order.id))
+			.where(eq(order.status, 'completed'));
+
+		for (const row of soldRows) {
+			if (artworkIds.includes(row.productId)) {
+				soldIds.add(row.productId);
+			}
+		}
+	}
+
 	return {
-		artworks
+		artworks: artworks.map((a) => ({
+			...a,
+			availability: soldIds.has(a.id) ? 'sold' : a.published ? 'available' : 'draft'
+		}))
 	};
 };
 

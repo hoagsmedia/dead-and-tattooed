@@ -4,10 +4,10 @@ import { superValidate } from 'sveltekit-superforms';
 import { zod4 } from 'sveltekit-superforms/adapters';
 import { checkoutSchema } from './schema.js';
 import { stripe } from '$lib/stripe.js';
-import { env } from '$env/dynamic/private';
 import { env as publicEnv } from '$env/dynamic/public';
 import { db } from '$lib/index.js';
 import { order, orderItem } from '../../db/schema.js';
+import { assertNotSoldToSomeoneElse, assertProductsAvailable, markProductsSold } from '$lib/inventory.js';
 import { nanoid } from 'nanoid';
 
 export const load: PageServerLoad = async ({ url }) => {
@@ -45,6 +45,9 @@ export const load: PageServerLoad = async ({ url }) => {
 	}> = [];
 
 	try {
+		// Reject already-sold / inactive one-of-a-kind pieces before creating a PaymentIntent
+		await assertProductsAvailable(cartItems.map((item) => item.productId));
+
 		// Fetch all prices from Stripe and validate them
 		for (const item of cartItems) {
 			// Fetch the price from Stripe
@@ -65,8 +68,8 @@ export const load: PageServerLoad = async ({ url }) => {
 			// Fetch the product to get the name and image
 			const product = await stripe.products.retrieve(item.productId);
 
-			// Validate quantity
-			const quantity = Math.max(1, Math.min(item.quantity || 1, 100)); // Clamp between 1 and 100
+			// One-of-a-kind: quantity must be exactly 1
+			const quantity = 1;
 
 			// Calculate line item total (price is in cents, quantity is a number)
 			const lineItemTotal = (price.unit_amount || 0) * quantity;
@@ -85,6 +88,9 @@ export const load: PageServerLoad = async ({ url }) => {
 		console.error('Error validating prices:', err);
 		if (err instanceof Error && err.message.includes('No such price')) {
 			throw error(400, 'Invalid price selected. Please refresh and try again.');
+		}
+		if (err instanceof Error && (err.message.includes('no longer available') || err.message.includes('already been sold'))) {
+			throw error(409, err.message);
 		}
 		// Re-throw if it's already an error response
 		if (err && typeof err === 'object' && 'status' in err) {
@@ -248,6 +254,31 @@ export const actions: Actions = {
 				console.error('Failed to parse cart items from payment intent:', e);
 			}
 
+			// Final availability check before recording the sale (race with another checkout).
+			// Allow this PaymentIntent even if the webhook already deactivated the Stripe product.
+			if (cartItems.length > 0) {
+				try {
+					await assertNotSoldToSomeoneElse(
+						cartItems.map((item) => item.productId),
+						paymentIntent.id
+					);
+				} catch (availabilityErr) {
+					return fail(409, {
+						checkoutForm: {
+							...form,
+							errors: {
+								...form.errors,
+								_email: [
+									availabilityErr instanceof Error
+										? availabilityErr.message
+										: 'One or more items are no longer available.'
+								]
+							}
+						}
+					});
+				}
+			}
+
 			// Prepare addresses
 			const shippingAddress = JSON.stringify({
 				street: form.data.shippingStreet,
@@ -298,6 +329,9 @@ export const actions: Actions = {
 						currency: item.currency.toUpperCase()
 					}))
 				);
+
+				// Remove from storefront catalog so the piece cannot be bought again
+				await markProductsSold(cartItems.map((item) => item.productId));
 			}
 
 			// Payment successful - order is complete

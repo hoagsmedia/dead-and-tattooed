@@ -11,6 +11,8 @@ export const load: PageServerLoad = async ({ params }) => {
 			expand: ['default_price']
 		});
 
+		const sold = !product.active || product.metadata?.sold === 'true';
+
 		// Fetch all active prices for this product
 		const prices = await stripe.prices.list({
 			product: productId,
@@ -24,6 +26,7 @@ export const load: PageServerLoad = async ({ params }) => {
 				description: product.description,
 				images: product.images,
 				metadata: product.metadata,
+				sold,
 				prices: prices.data.map((price) => ({
 					id: price.id,
 					amount: price.unit_amount,
