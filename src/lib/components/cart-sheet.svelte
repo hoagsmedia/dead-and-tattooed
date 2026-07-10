@@ -28,6 +28,21 @@
 		onClose?.();
 		goto('/products');
 	}
+
+	function handleCheckout() {
+		onClose?.();
+		// Only pass priceId, productId, and quantity - prices will be validated server-side
+		const cartData = encodeURIComponent(
+			JSON.stringify(
+				cart.items.map((item) => ({
+					productId: item.productId,
+					priceId: item.priceId,
+					quantity: item.quantity
+				}))
+			)
+		);
+		goto(`/checkout?cart=${cartData}`);
+	}
 </script>
 
 {#if cart.isEmpty}
@@ -44,7 +59,7 @@
 			{#each cart.items as item}
 				<div class="flex gap-4 border-b pb-4 last:border-0">
 					{#if item.image}
-						<div class="w-20 h-20 flex-shrink-0 overflow-hidden rounded-lg border bg-muted">
+						<div class="w-20 h-20 shrink-0 overflow-hidden rounded-lg border bg-muted">
 							<img src={item.image} alt={item.name} class="w-full h-full object-contain" />
 						</div>
 					{/if}
@@ -96,11 +111,8 @@
 				</div>
 				<div class="flex gap-2">
 					<Button variant="outline" class="flex-1" onclick={handleClearCart}>Clear Cart</Button>
-					<Button class="flex-1" size="lg" disabled>Checkout</Button>
+					<Button class="flex-1" size="lg" onclick={handleCheckout}>Proceed to Checkout</Button>
 				</div>
-				<p class="text-xs text-muted-foreground text-center mt-2">
-					Checkout functionality coming soon
-				</p>
 			</div>
 		</div>
 	</div>
