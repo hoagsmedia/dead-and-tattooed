@@ -1,0 +1,4 @@
+{
+	"$schema": "https://openapi.vercel.sh/vercel.json",
+	"ignoreCommand": "bash -c 'if [[ \"$VERCEL_GIT_COMMIT_MESSAGE\" == *\"[deploy]\"* ]] || [[ \"$VERCEL_GIT_COMMIT_MESSAGE\" == *\"[vercel]\"* ]]; then exit 1; else echo \"Skipping Vercel build — add [deploy] to the commit message when you want a deployment\"; exit 0; fi'"
+}
