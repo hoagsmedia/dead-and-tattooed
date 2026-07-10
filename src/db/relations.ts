@@ -1,5 +1,5 @@
 import { relations } from 'drizzle-orm/relations';
-import { user, session, account, artwork } from './schema';
+import { user, session, account, artwork, order, orderItem } from './schema';
 
 export const sessionRelations = relations(session, ({ one }) => ({
 	user: one(user, {
@@ -25,5 +25,16 @@ export const artworkRelations = relations(artwork, ({ one }) => ({
 	user: one(user, {
 		fields: [artwork.userId],
 		references: [user.id]
+	})
+}));
+
+export const orderRelations = relations(order, ({ many }) => ({
+	items: many(orderItem)
+}));
+
+export const orderItemRelations = relations(orderItem, ({ one }) => ({
+	order: one(order, {
+		fields: [orderItem.orderId],
+		references: [order.id]
 	})
 }));

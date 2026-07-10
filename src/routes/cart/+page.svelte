@@ -22,6 +22,20 @@
 		// If multi-currency support is needed, totals should be grouped by currency
 		return cart.items[0].currency;
 	}
+
+	function handleCheckout() {
+		// Only pass priceId, productId, and quantity - prices will be validated server-side
+		const cartData = encodeURIComponent(
+			JSON.stringify(
+				cart.items.map((item) => ({
+					productId: item.productId,
+					priceId: item.priceId,
+					quantity: item.quantity
+				}))
+			)
+		);
+		goto(`/checkout?cart=${cartData}`);
+	}
 </script>
 
 <div class="container mx-auto px-4 py-8">
@@ -48,12 +62,8 @@
 						<Card.Content class="p-6">
 							<div class="flex gap-4">
 								{#if item.image}
-									<div class="w-24 h-24 flex-shrink-0 overflow-hidden rounded-lg border bg-muted">
-										<img
-											src={item.image}
-											alt={item.name}
-											class="w-full h-full object-contain"
-										/>
+									<div class="w-24 h-24 shrink-0 overflow-hidden rounded-lg border bg-muted">
+										<img src={item.image} alt={item.name} class="w-full h-full object-contain" />
 									</div>
 								{/if}
 								<div class="flex-1 min-w-0">
@@ -88,9 +98,7 @@
 				{/each}
 
 				<div class="flex justify-end">
-					<Button variant="outline" onclick={handleClearCart}>
-						Clear Cart
-					</Button>
+					<Button variant="outline" onclick={handleClearCart}>Clear Cart</Button>
 				</div>
 			</div>
 
@@ -116,12 +124,7 @@
 								<span>Total</span>
 								<span>{formatPrice(cart.total, getTotalCurrency())}</span>
 							</div>
-							<Button class="w-full" size="lg" disabled>
-								Checkout
-							</Button>
-							<p class="text-xs text-muted-foreground text-center mt-2">
-								Checkout functionality coming soon
-							</p>
+							<Button class="w-full" size="lg" onclick={handleCheckout}>Checkout</Button>
 						</div>
 					</Card.Content>
 				</Card.Root>
@@ -129,4 +132,3 @@
 		</div>
 	{/if}
 </div>
-

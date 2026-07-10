@@ -59,7 +59,7 @@ class CartStore {
 	private save() {
 		if (typeof window !== 'undefined') {
 			try {
-				localStorage.setItem('cart', JSON.stringify(this._items));
+			localStorage.setItem('cart', JSON.stringify(this._items));
 			} catch (e) {
 				// Handle quota exceeded or other storage errors
 				if (e instanceof DOMException && e.name === 'QuotaExceededError') {
@@ -83,10 +83,10 @@ class CartStore {
 		}
 
 		// Add new item with quantity always set to 1
-		this._items.push({
-			...item,
+			this._items.push({
+				...item,
 			quantity: 1
-		});
+			});
 
 		this.save();
 		return true;
@@ -104,7 +104,7 @@ class CartStore {
 	// since products are one-of-a-kind and quantity is always 1
 	updateQuantity(productId: string, _priceId: string, quantity: number) {
 		// If quantity is 0 or less, remove the item
-		if (quantity <= 0) {
+			if (quantity <= 0) {
 			this.removeItem(productId);
 		}
 		// Otherwise, do nothing since quantity must always be 1

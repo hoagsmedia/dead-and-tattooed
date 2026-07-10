@@ -15,6 +15,13 @@
       "when": 1762044157160,
       "tag": "0001_fresh_molly_hayes",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1764545869842,
+      "tag": "0002_watery_pixie",
+      "breakpoints": true
     }
   ]
 }

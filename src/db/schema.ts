@@ -75,3 +75,34 @@ export const artwork = pgTable("artwork", {
     .$onUpdate(() => /* @__PURE__ */ new Date())
     .notNull(),
 });
+
+export const order = pgTable("order", {
+  id: text("id").primaryKey(),
+  paymentIntentId: text("payment_intent_id").notNull().unique(),
+  customerName: text("customer_name").notNull(),
+  customerEmail: text("customer_email").notNull(),
+  customerPhone: text("customer_phone"),
+  shippingAddress: text("shipping_address").notNull(), // JSON string
+  billingAddress: text("billing_address").notNull(), // JSON string
+  total: numeric("total", { precision: 10, scale: 2 }).notNull(),
+  currency: text("currency").notNull().default("usd"),
+  status: text("status").notNull().default("pending"), // pending, completed, cancelled
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .$onUpdate(() => /* @__PURE__ */ new Date())
+    .notNull(),
+});
+
+export const orderItem = pgTable("order_item", {
+  id: text("id").primaryKey(),
+  orderId: text("order_id")
+    .notNull()
+    .references(() => order.id, { onDelete: "cascade" }),
+  productId: text("product_id").notNull(),
+  priceId: text("price_id").notNull(),
+  name: text("name").notNull(),
+  price: numeric("price", { precision: 10, scale: 2 }).notNull(),
+  currency: text("currency").notNull().default("usd"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});

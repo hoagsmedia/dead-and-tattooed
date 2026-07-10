@@ -41,15 +41,15 @@
 			<Sheet.Root bind:open={cartSheetOpen}>
 				<Sheet.Trigger
 					class="relative inline-flex h-8 items-center justify-center gap-1.5 rounded-md px-3 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
-				>
-					<ShoppingCart class="size-5" />
+			>
+				<ShoppingCart class="size-5" />
 					{#if cart.itemCount > 0}
-						<span
-							class="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground"
-						>
+					<span
+						class="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground"
+					>
 							{cart.itemCount}
-						</span>
-					{/if}
+					</span>
+				{/if}
 				</Sheet.Trigger>
 				<Sheet.Content side="right" class="w-full sm:max-w-lg flex flex-col">
 					<Sheet.Header>
