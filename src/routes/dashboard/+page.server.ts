@@ -1,4 +1,5 @@
 import { fail, redirect } from '@sveltejs/kit';
+import { isAdmin } from '$lib/server/admin';
 import type { PageServerLoad, Actions } from './$types';
 import { db } from '$lib/index';
 import { artwork, order, orderItem } from '../../db/schema';
@@ -18,7 +19,7 @@ function readPublished(value: FormDataEntryValue | null): boolean {
 }
 
 export const load: PageServerLoad = async ({ locals }) => {
-	if (!locals.user) {
+	if (!locals.user || !isAdmin(locals.user.email)) {
 		throw redirect(302, '/auth');
 	}
 
@@ -70,7 +71,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 export const actions: Actions = {
 	create: async ({ request, locals }) => {
-		if (!locals.user) {
+		if (!locals.user || !isAdmin(locals.user.email)) {
 			return fail(401, { error: 'Unauthorized' });
 		}
 
@@ -107,7 +108,7 @@ export const actions: Actions = {
 	},
 
 	update: async ({ request, locals }) => {
-		if (!locals.user) {
+		if (!locals.user || !isAdmin(locals.user.email)) {
 			return fail(401, { error: 'Unauthorized' });
 		}
 
@@ -143,7 +144,7 @@ export const actions: Actions = {
 	},
 
 	delete: async ({ request, locals }) => {
-		if (!locals.user) {
+		if (!locals.user || !isAdmin(locals.user.email)) {
 			return fail(401, { error: 'Unauthorized' });
 		}
 
