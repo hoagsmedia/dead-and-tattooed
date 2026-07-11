@@ -33,11 +33,11 @@
 		</Form.Control>
 		<Form.FieldErrors />
 	</Form.Field>
-	<Form.Field {form} name="email">
+	<Form.Field {form} name="password">
 		<Form.Control>
 			{#snippet children({ props })}
-				<Form.Label>password</Form.Label>
-				<Input {...props} bind:value={$formData.password} />
+				<Form.Label>Password</Form.Label>
+				<Input {...props} type="password" bind:value={$formData.password} />
 			{/snippet}
 		</Form.Control>
 		<Form.FieldErrors />
