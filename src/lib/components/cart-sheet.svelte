@@ -7,21 +7,14 @@
 
 	let { onClose }: { onClose?: () => void } = $props();
 
-	function handleRemoveItem(productId: string) {
-		cart.removeItem(productId);
+	function handleRemoveItem(artworkId: string) {
+		cart.removeItem(artworkId);
 	}
 
 	function handleClearCart() {
 		if (confirm('Are you sure you want to clear your cart?')) {
 			cart.clear();
 		}
-	}
-
-	function getTotalCurrency() {
-		if (cart.items.length === 0) return 'USD';
-		// Note: Assumes all items have the same currency
-		// If multi-currency support is needed, totals should be grouped by currency
-		return cart.items[0].currency;
 	}
 
 	function handleBrowseProducts() {
@@ -31,17 +24,7 @@
 
 	function handleCheckout() {
 		onClose?.();
-		// Only pass priceId, productId, and quantity - prices will be validated server-side
-		const cartData = encodeURIComponent(
-			JSON.stringify(
-				cart.items.map((item) => ({
-					productId: item.productId,
-					priceId: item.priceId,
-					quantity: item.quantity
-				}))
-			)
-		);
-		goto(`/checkout?cart=${cartData}`);
+		goto('/checkout');
 	}
 </script>
 
@@ -49,36 +32,29 @@
 	<div class="flex flex-col items-center justify-center py-12 text-center px-4">
 		<ShoppingBag class="size-12 mb-4 text-muted-foreground" />
 		<p class="text-lg font-medium mb-2">Your cart is empty</p>
-		<p class="text-muted-foreground mb-6">Start adding products to your cart</p>
-		<Button onclick={handleBrowseProducts}>Browse Products</Button>
+		<p class="text-muted-foreground mb-6">Browse the gallery to find your piece</p>
+		<Button onclick={handleBrowseProducts}>Browse Gallery</Button>
 	</div>
 {:else}
 	<div class="flex flex-col flex-1 min-h-0">
 		<!-- Cart Items - Scrollable -->
 		<div class="flex-1 overflow-y-auto px-4 min-h-0 space-y-4 py-4">
-			{#each cart.items as item}
+			{#each cart.items as item (item.artworkId)}
 				<div class="flex gap-4 border-b pb-4 last:border-0">
 					{#if item.image}
 						<div class="w-20 h-20 shrink-0 overflow-hidden rounded-lg border bg-muted">
-							<img src={item.image} alt={item.name} class="w-full h-full object-contain" />
+							<img src={item.image} alt={item.title} class="w-full h-full object-contain" />
 						</div>
 					{/if}
 					<div class="flex-1 min-w-0">
-						<h3 class="font-semibold text-base mb-1 truncate">{item.name}</h3>
+						<h3 class="font-semibold text-base mb-1 truncate">{item.title}</h3>
 						<p class="text-sm text-muted-foreground mb-2">
-							{formatPrice(item.price, item.currency)}
-							{#if item.recurring}
-								<span class="text-xs">
-									/ {item.recurring.interval_count === 1
-										? item.recurring.interval
-										: `${item.recurring.interval_count} ${item.recurring.interval}s`}
-								</span>
-							{/if}
+							{formatPrice(item.priceCents, 'usd')}
 						</p>
 						<Button
 							variant="ghost"
 							size="sm"
-							onclick={() => handleRemoveItem(item.productId)}
+							onclick={() => handleRemoveItem(item.artworkId)}
 							class="h-8"
 						>
 							<Trash2 class="mr-2 size-3" />
@@ -86,7 +62,7 @@
 						</Button>
 					</div>
 					<div class="text-right">
-						<p class="font-semibold">{formatPrice(item.price, item.currency)}</p>
+						<p class="font-semibold">{formatPrice(item.priceCents, 'usd')}</p>
 					</div>
 				</div>
 			{/each}
@@ -97,7 +73,7 @@
 			<div class="space-y-2">
 				<div class="flex justify-between text-sm">
 					<span class="text-muted-foreground">Subtotal</span>
-					<span>{formatPrice(cart.total, getTotalCurrency())}</span>
+					<span>{formatPrice(cart.total, 'usd')}</span>
 				</div>
 				<div class="flex justify-between text-sm">
 					<span class="text-muted-foreground">Items</span>
@@ -107,7 +83,7 @@
 			<div class="border-t pt-4">
 				<div class="flex justify-between text-lg font-semibold mb-4">
 					<span>Total</span>
-					<span>{formatPrice(cart.total, getTotalCurrency())}</span>
+					<span>{formatPrice(cart.total, 'usd')}</span>
 				</div>
 				<div class="flex gap-2">
 					<Button variant="outline" class="flex-1" onclick={handleClearCart}>Clear Cart</Button>

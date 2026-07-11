@@ -1,50 +1,33 @@
 import type { PageServerLoad } from './$types.js';
-import { stripe } from '$lib/stripe.js';
 import { error } from '@sveltejs/kit';
+import { asc, desc, eq } from 'drizzle-orm';
+import { db } from '$lib/index.js';
+import { artwork } from '../../db/schema.js';
+import { dollarsToCents, releaseExpiredReservations } from '$lib/inventory.js';
 
 export const load: PageServerLoad = async () => {
 	try {
-		// Fetch products with their prices
-		const products = await stripe.products.list({
-			active: true,
-			expand: ['data.default_price']
-		});
+		// Lazily free up pieces whose checkout reservation expired
+		await releaseExpiredReservations(db);
 
-		// Fetch prices for all products
-		const productsWithPrices = await Promise.all(
-			products.data.map(async (product) => {
-				const prices = await stripe.prices.list({
-					product: product.id,
-					active: true
-				});
-
-				return {
-					id: product.id,
-					name: product.name,
-					description: product.description,
-					images: product.images,
-					metadata: product.metadata,
-					prices: prices.data.map((price) => ({
-						id: price.id,
-						amount: price.unit_amount,
-						currency: price.currency,
-						recurring: price.recurring
-							? {
-									interval: price.recurring.interval,
-									interval_count: price.recurring.interval_count
-								}
-							: null
-					}))
-				};
-			})
-		);
+		const artworks = await db
+			.select()
+			.from(artwork)
+			.where(eq(artwork.published, true))
+			.orderBy(asc(artwork.sortOrder), desc(artwork.createdAt));
 
 		return {
-			products: productsWithPrices
+			artworks: artworks.map((piece) => ({
+				id: piece.id,
+				title: piece.title,
+				description: piece.description,
+				image: piece.images[0] ?? null,
+				priceCents: dollarsToCents(piece.price),
+				status: piece.status
+			}))
 		};
 	} catch (err) {
-		console.error('Error fetching Stripe products:', err);
-		throw error(500, 'Failed to load products');
+		console.error('Error loading artwork:', err);
+		throw error(500, 'Failed to load the gallery');
 	}
 };
-

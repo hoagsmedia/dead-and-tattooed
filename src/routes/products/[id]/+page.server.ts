@@ -1,47 +1,32 @@
 import type { PageServerLoad } from './$types.js';
-import { stripe } from '$lib/stripe.js';
 import { error } from '@sveltejs/kit';
+import { and, eq } from 'drizzle-orm';
+import { db } from '$lib/index.js';
+import { artwork } from '../../../db/schema.js';
+import { dollarsToCents, releaseExpiredReservations } from '$lib/inventory.js';
 
 export const load: PageServerLoad = async ({ params }) => {
-	try {
-		const productId = params.id;
+	// Lazily free up pieces whose checkout reservation expired
+	await releaseExpiredReservations(db);
 
-		// Fetch the product
-		const product = await stripe.products.retrieve(productId, {
-			expand: ['default_price']
-		});
+	const [piece] = await db
+		.select()
+		.from(artwork)
+		.where(and(eq(artwork.id, params.id), eq(artwork.published, true)))
+		.limit(1);
 
-		const sold = !product.active || product.metadata?.sold === 'true';
-
-		// Fetch all active prices for this product
-		const prices = await stripe.prices.list({
-			product: productId,
-			active: true
-		});
-
-		return {
-			product: {
-				id: product.id,
-				name: product.name,
-				description: product.description,
-				images: product.images,
-				metadata: product.metadata,
-				sold,
-				prices: prices.data.map((price) => ({
-					id: price.id,
-					amount: price.unit_amount,
-					currency: price.currency,
-					recurring: price.recurring
-						? {
-								interval: price.recurring.interval,
-								interval_count: price.recurring.interval_count
-							}
-						: null
-				}))
-			}
-		};
-	} catch (err) {
-		console.error('Error fetching Stripe product:', err);
-		throw error(404, 'Product not found');
+	if (!piece) {
+		throw error(404, 'Piece not found');
 	}
+
+	return {
+		artwork: {
+			id: piece.id,
+			title: piece.title,
+			description: piece.description,
+			images: piece.images,
+			priceCents: dollarsToCents(piece.price),
+			status: piece.status
+		}
+	};
 };
