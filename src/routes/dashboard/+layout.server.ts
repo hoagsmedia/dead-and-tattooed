@@ -11,4 +11,3 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 		user: locals.user
 	};
 };
-
