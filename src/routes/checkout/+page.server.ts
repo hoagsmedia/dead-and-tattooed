@@ -1,359 +1,161 @@
 import type { PageServerLoad, Actions } from './$types.js';
-import { fail, redirect, error } from '@sveltejs/kit';
-import { superValidate } from 'sveltekit-superforms';
-import { zod4 } from 'sveltekit-superforms/adapters';
-import { checkoutSchema } from './schema.js';
+import { fail, error } from '@sveltejs/kit';
+import { z } from 'zod';
+import { inArray } from 'drizzle-orm';
 import { stripe } from '$lib/stripe.js';
+import { env } from '$env/dynamic/private';
 import { env as publicEnv } from '$env/dynamic/public';
 import { db } from '$lib/index.js';
-import { order, orderItem } from '../../db/schema.js';
-import { assertNotSoldToSomeoneElse, assertProductsAvailable, markProductsSold } from '$lib/inventory.js';
-import { nanoid } from 'nanoid';
+import { artwork } from '../../db/schema.js';
+import {
+	ArtworkUnavailableError,
+	dollarsToCents,
+	releaseReservations,
+	reserveArtworks
+} from '$lib/inventory.js';
 
-export const load: PageServerLoad = async ({ url }) => {
-	// Get cart items from query params (only priceId, productId, quantity - no prices!)
-	const cartData = url.searchParams.get('cart');
-	let cartItems: Array<{
-		productId: string;
-		priceId: string;
-		quantity: number;
-	}> = [];
+/** Countries we ship to. Extend as needed. */
+const ALLOWED_COUNTRIES: Array<'US'> = ['US'];
 
-	if (cartData) {
-		try {
-			cartItems = JSON.parse(cartData);
-		} catch (e) {
-			console.error('Failed to parse cart data:', e);
-			throw redirect(302, '/products');
-		}
-	}
+const sessionRequestSchema = z.object({
+	artworkIds: z.array(z.string().min(1)).min(1).max(50),
+	existingSessionId: z.string().startsWith('cs_').optional()
+});
 
-	if (cartItems.length === 0) {
-		throw redirect(302, '/products');
-	}
-
-	// SECURITY: Fetch and validate prices from Stripe API
-	// This prevents price manipulation attacks
-	const validatedItems: Array<{
-		productId: string;
-		priceId: string;
-		name: string;
-		image: string | null;
-		price: number;
-		currency: string;
-		quantity: number;
-	}> = [];
-
-	try {
-		// Reject already-sold / inactive one-of-a-kind pieces before creating a PaymentIntent
-		await assertProductsAvailable(cartItems.map((item) => item.productId));
-
-		// Fetch all prices from Stripe and validate them
-		for (const item of cartItems) {
-			// Fetch the price from Stripe
-			const price = await stripe.prices.retrieve(item.priceId);
-
-			// Validate that the price exists and is active
-			if (!price || !price.active) {
-				console.error(`Price ${item.priceId} is not active or does not exist`);
-				throw error(400, 'Invalid price selected. Please refresh and try again.');
-			}
-
-			// Validate that the price belongs to the specified product
-			if (price.product !== item.productId) {
-				console.error(`Price ${item.priceId} does not belong to product ${item.productId}`);
-				throw error(400, 'Price mismatch detected. Please refresh and try again.');
-			}
-
-			// Fetch the product to get the name and image
-			const product = await stripe.products.retrieve(item.productId);
-
-			// One-of-a-kind: quantity must be exactly 1
-			const quantity = 1;
-
-			// Calculate line item total (price is in cents, quantity is a number)
-			const lineItemTotal = (price.unit_amount || 0) * quantity;
-
-			validatedItems.push({
-				productId: item.productId,
-				priceId: item.priceId,
-				name: product.name,
-				image: product.images && product.images.length > 0 ? product.images[0] : null,
-				price: lineItemTotal, // Total for this line item (price * quantity)
-				currency: price.currency,
-				quantity
-			});
-		}
-	} catch (err) {
-		console.error('Error validating prices:', err);
-		if (err instanceof Error && err.message.includes('No such price')) {
-			throw error(400, 'Invalid price selected. Please refresh and try again.');
-		}
-		if (err instanceof Error && (err.message.includes('no longer available') || err.message.includes('already been sold'))) {
-			throw error(409, err.message);
-		}
-		// Re-throw if it's already an error response
-		if (err && typeof err === 'object' && 'status' in err) {
-			throw err;
-		}
-		throw error(500, 'Failed to validate cart items. Please try again.');
-	}
-
-	// Calculate total from validated prices
-	const total = validatedItems.reduce((sum, item) => sum + item.price, 0);
-	const currency = validatedItems[0]?.currency || 'usd';
-
-	// Validate all items use the same currency
-	const allSameCurrency = validatedItems.every((item) => item.currency === currency);
-	if (!allSameCurrency) {
-		throw error(400, 'All items must use the same currency.');
-	}
-
-	// Create PaymentIntent
-	let clientSecret: string;
-	try {
-		const paymentIntent = await stripe.paymentIntents.create({
-			amount: total, // Amount is already in cents
-			currency: currency.toLowerCase(),
-			automatic_payment_methods: {
-				enabled: true
-			},
-			metadata: {
-				cartItems: JSON.stringify(
-					validatedItems.map((item) => ({
-						productId: item.productId,
-						priceId: item.priceId,
-						name: item.name,
-						price: item.price,
-						currency: item.currency,
-						quantity: item.quantity
-					}))
-				)
-			}
-		});
-
-		clientSecret = paymentIntent.client_secret || '';
-	} catch (err) {
-		console.error('Error creating PaymentIntent:', err);
-		throw error(500, 'Failed to initialize payment');
-	}
-
-	// Get Stripe publishable key from environment
+export const load: PageServerLoad = async () => {
 	const publishableKey = publicEnv.PUBLIC_STRIPE_PUBLISHABLE_KEY;
 
 	if (!publishableKey) {
 		throw error(500, 'Stripe publishable key is not configured');
 	}
 
-	return {
-		checkoutForm: await superValidate(zod4(checkoutSchema)),
-		clientSecret,
-		publishableKey,
-		cartItems: validatedItems
-	};
+	return { publishableKey };
 };
 
 export const actions: Actions = {
-	checkout: async ({ request }) => {
+	/**
+	 * Create an embedded Checkout Session for the cart's artwork.
+	 *
+	 * Prices, titles and images come from the local `artwork` table — Stripe is
+	 * purely the payment rail (inline `price_data`, no catalog products/prices).
+	 * Pieces are atomically reserved before the session is created so a
+	 * one-of-a-kind piece can never be oversold.
+	 */
+	session: async ({ request, url }) => {
 		const formData = await request.formData();
-		const form = await superValidate(formData, zod4(checkoutSchema));
 
-		if (!form.valid) {
-			return fail(400, {
-				checkoutForm: form
-			});
+		let rawIds: unknown;
+		try {
+			rawIds = JSON.parse(formData.get('artworkIds')?.toString() ?? '[]');
+		} catch {
+			return fail(400, { message: 'Invalid cart data. Please refresh and try again.' });
 		}
 
-		// Get payment intent ID from form data (set by client after payment confirmation)
-		const paymentIntentId = formData.get('paymentIntentId') as string | null;
+		const parsed = sessionRequestSchema.safeParse({
+			artworkIds: rawIds,
+			existingSessionId: formData.get('existingSessionId')?.toString() || undefined
+		});
 
-		if (!paymentIntentId) {
-			return fail(400, {
-				checkoutForm: {
-					...form,
-					errors: {
-						...form.errors,
-						_email: ['Payment intent not found']
-					}
+		if (!parsed.success) {
+			return fail(400, { message: 'Invalid cart data. Please refresh and try again.' });
+		}
+
+		const artworkIds = [...new Set(parsed.data.artworkIds)].sort();
+
+		// Reuse an open session for the same pieces (e.g. page refresh) instead of
+		// re-reserving — the buyer already holds the reservation.
+		if (parsed.data.existingSessionId) {
+			try {
+				const existing = await stripe.checkout.sessions.retrieve(parsed.data.existingSessionId);
+				const existingIds = JSON.parse(existing.metadata?.artworkIds ?? '[]') as string[];
+				if (
+					existing.status === 'open' &&
+					existing.client_secret &&
+					JSON.stringify([...existingIds].sort()) === JSON.stringify(artworkIds)
+				) {
+					return { clientSecret: existing.client_secret, sessionId: existing.id };
 				}
-			});
+			} catch {
+				// Stale or foreign session id — fall through and create a new one
+			}
+		}
+
+		// Load the pieces from the local db (single source of truth)
+		const pieces = await db.select().from(artwork).where(inArray(artwork.id, artworkIds));
+
+		const piecesById = new Map(pieces.map((piece) => [piece.id, piece]));
+		for (const id of artworkIds) {
+			const piece = piecesById.get(id);
+			if (!piece || !piece.published) {
+				return fail(409, {
+					message: 'One of the pieces in your cart is no longer available.',
+					unavailableIds: [id]
+				});
+			}
+			if (dollarsToCents(piece.price) === null) {
+				return fail(400, {
+					message: `"${piece.title}" cannot be purchased right now. Please remove it from your cart.`,
+					unavailableIds: [id]
+				});
+			}
+		}
+
+		// Oversell guard: atomically reserve every piece or none
+		try {
+			await reserveArtworks(db, artworkIds);
+		} catch (err) {
+			if (err instanceof ArtworkUnavailableError) {
+				return fail(409, {
+					message: err.message,
+					unavailableIds: err.unavailable.map((piece) => piece.id)
+				});
+			}
+			console.error('Error reserving artwork for checkout:', err);
+			return fail(500, { message: 'Failed to start checkout. Please try again.' });
 		}
 
 		try {
-			// Retrieve and verify the payment intent
-			const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
-
-			console.log('Payment intent status on server:', paymentIntent.status);
-
-			// Accept both 'succeeded' and 'requires_capture' statuses
-			// 'requires_capture' means payment is authorized but not yet captured
-			// For most use cases, we can treat this as successful
-			if (paymentIntent.status !== 'succeeded' && paymentIntent.status !== 'requires_capture') {
-				console.error('Payment intent in invalid status:', paymentIntent.status);
-				return fail(400, {
-					checkoutForm: {
-						...form,
-						errors: {
-							...form.errors,
-							_email: [`Payment status is ${paymentIntent.status}. Payment was not successful.`]
-						}
-					}
-				});
-			}
-
-			// Update payment intent with customer and shipping information
-			await stripe.paymentIntents.update(paymentIntentId, {
-				shipping: {
-					name: form.data.name,
-					address: {
-						line1: form.data.shippingStreet,
-						city: form.data.shippingCity,
-						state: form.data.shippingState,
-						postal_code: form.data.shippingZip,
-						country: form.data.shippingCountry.toUpperCase()
-					},
-					phone: form.data.phone
-				},
-				metadata: {
-					...paymentIntent.metadata,
-					customerName: form.data.name,
-					customerEmail: form.data.email,
-					customerPhone: form.data.phone || '',
-					billingAddress: form.data.useShippingForBilling
-						? JSON.stringify({
-								street: form.data.shippingStreet,
-								city: form.data.shippingCity,
-								state: form.data.shippingState,
-								zip: form.data.shippingZip,
-								country: form.data.shippingCountry
-							})
-						: JSON.stringify({
-								street: form.data.billingStreet,
-								city: form.data.billingCity,
-								state: form.data.billingState,
-								zip: form.data.billingZip,
-								country: form.data.billingCountry
-							})
-				}
-			});
-
-			// Parse cart items from payment intent metadata
-			let cartItems: Array<{
-				productId: string;
-				priceId: string;
-				name: string;
-				price: number;
-				currency: string;
-				quantity: number;
-			}> = [];
-			try {
-				if (paymentIntent.metadata.cartItems) {
-					cartItems = JSON.parse(paymentIntent.metadata.cartItems);
-				}
-			} catch (e) {
-				console.error('Failed to parse cart items from payment intent:', e);
-			}
-
-			// Final availability check before recording the sale (race with another checkout).
-			// Allow this PaymentIntent even if the webhook already deactivated the Stripe product.
-			if (cartItems.length > 0) {
-				try {
-					await assertNotSoldToSomeoneElse(
-						cartItems.map((item) => item.productId),
-						paymentIntent.id
-					);
-				} catch (availabilityErr) {
-					return fail(409, {
-						checkoutForm: {
-							...form,
-							errors: {
-								...form.errors,
-								_email: [
-									availabilityErr instanceof Error
-										? availabilityErr.message
-										: 'One or more items are no longer available.'
-								]
+			const session = await stripe.checkout.sessions.create({
+				ui_mode: 'embedded',
+				mode: 'payment',
+				line_items: artworkIds.map((id) => {
+					const piece = piecesById.get(id)!;
+					const firstImage = piece.images[0];
+					return {
+						quantity: 1,
+						price_data: {
+							currency: 'usd',
+							unit_amount: dollarsToCents(piece.price)!,
+							product_data: {
+								name: piece.title,
+								...(firstImage ? { images: [firstImage] } : {}),
+								...(piece.description ? { description: piece.description } : {})
 							}
 						}
-					});
+					};
+				}),
+				shipping_address_collection: { allowed_countries: ALLOWED_COUNTRIES },
+				...(env.STRIPE_AUTOMATIC_TAX === '1' ? { automatic_tax: { enabled: true } } : {}),
+				customer_creation: 'if_required',
+				return_url: `${url.origin}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
+				// Keep the session lifetime aligned with the 30 minute reservation
+				// (Stripe requires expires_at to be at least 30 minutes out)
+				expires_at: Math.floor(Date.now() / 1000) + 31 * 60,
+				metadata: {
+					artworkIds: JSON.stringify(artworkIds)
 				}
-			}
-
-			// Prepare addresses
-			const shippingAddress = JSON.stringify({
-				street: form.data.shippingStreet,
-				city: form.data.shippingCity,
-				state: form.data.shippingState,
-				zip: form.data.shippingZip,
-				country: form.data.shippingCountry
 			});
 
-			const billingAddress = form.data.useShippingForBilling
-				? shippingAddress
-				: JSON.stringify({
-						street: form.data.billingStreet,
-						city: form.data.billingCity,
-						state: form.data.billingState,
-						zip: form.data.billingZip,
-						country: form.data.billingCountry
-					});
-
-			// Create order in database
-			const orderId = nanoid();
-			const orderTotal = paymentIntent.amount / 100; // Convert from cents
-			const orderCurrency = paymentIntent.currency.toUpperCase();
-
-			await db.insert(order).values({
-				id: orderId,
-				paymentIntentId: paymentIntent.id,
-				customerName: form.data.name,
-				customerEmail: form.data.email,
-				customerPhone: form.data.phone || null,
-				shippingAddress,
-				billingAddress,
-				total: orderTotal.toString(),
-				currency: orderCurrency,
-				status: 'completed'
-			});
-
-			// Create order items from cart items
-			if (cartItems.length > 0) {
-				await db.insert(orderItem).values(
-					cartItems.map((item) => ({
-						id: nanoid(),
-						orderId,
-						productId: item.productId,
-						priceId: item.priceId,
-						name: item.name,
-						price: (item.price / 100).toString(), // Convert from cents
-						currency: item.currency.toUpperCase()
-					}))
-				);
-
-				// Remove from storefront catalog so the piece cannot be bought again
-				await markProductsSold(cartItems.map((item) => item.productId));
+			if (!session.client_secret) {
+				throw new Error('Checkout session has no client secret');
 			}
 
-			// Payment successful - order is complete
-			// Cart will be cleared on client side
-
-			return {
-				checkoutForm: form,
-				success: true,
-				paymentIntentId: paymentIntent.id,
-				orderId
-			};
+			return { clientSecret: session.client_secret, sessionId: session.id };
 		} catch (err) {
-			console.error('Error processing checkout:', err);
-			return fail(500, {
-				checkoutForm: {
-					...form,
-					errors: {
-						...form.errors,
-						_email: [err instanceof Error ? err.message : 'Payment processing failed']
-					}
-				}
-			});
+			console.error('Error creating checkout session:', err);
+			// Give the pieces back — the buyer never saw a payment form
+			await releaseReservations(db, artworkIds);
+			return fail(500, { message: 'Failed to start checkout. Please try again.' });
 		}
 	}
 };

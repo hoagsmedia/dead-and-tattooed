@@ -2,17 +2,31 @@
 	import '../app.css';
 	import { injectAnalytics } from '@vercel/analytics/sveltekit';
 	import type { LayoutData } from './$types.js';
-	import Navbar from '$lib/components/navbar.svelte';
+	import { page } from '$app/state';
+	import SiteHeader from './Components/Site-Header.svelte';
+	import SiteFooter from './Components/Site-Footer.svelte';
 	injectAnalytics();
 
-	let { data, children }: { data: LayoutData; children: any } = $props();
+	let { children }: { data: LayoutData; children: import('svelte').Snippet } = $props();
+
+	const ogImage = $derived(new URL('/deadandtattooed.png', page.url.origin).href);
 </script>
 
+<svelte:head>
+	<meta property="og:site_name" content="Dead & Tattooed" />
+	<meta property="og:type" content="website" />
+	<meta property="og:image" content={ogImage} />
+	<meta name="twitter:card" content="summary_large_image" />
+</svelte:head>
+
 <div class="flex min-h-screen flex-col">
-	<Navbar {data} />
+	<SiteHeader />
 	<main class="flex-1">
-		<div class="flex flex-col justify-center items-center mx-auto max-w-5xl sm:px-6 lg:px-8 py-8">
+		<div
+			class="mx-auto flex max-w-5xl flex-col items-center justify-center px-4 py-8 sm:px-6 lg:px-8"
+		>
 			{@render children()}
 		</div>
 	</main>
+	<SiteFooter />
 </div>

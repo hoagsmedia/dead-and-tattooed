@@ -23,7 +23,12 @@
 	const { form: passwordData, enhance: passwordEnhance } = changePasswordForm;
 </script>
 
-<div class="space-y-6">
+<svelte:head>
+	<title>Profile — Dead &amp; Tattooed</title>
+	<meta name="description" content="Update your seller profile and password." />
+</svelte:head>
+
+<div class="w-full space-y-6">
 	<Card.Root>
 		<Card.Header>
 			<Card.Title>Update Profile</Card.Title>
@@ -31,7 +36,7 @@
 		</Card.Header>
 		<Card.Content>
 			<form method="POST" action="?/updateProfile" use:profileEnhance class="space-y-4">
-				<Form.Field form={$profileData} name="name">
+				<Form.Field form={updateProfileForm} name="name">
 					<Form.Control>
 						{#snippet children({ props })}
 							<Form.Label>Name</Form.Label>
@@ -41,7 +46,7 @@
 					<Form.FieldErrors />
 				</Form.Field>
 
-				<Form.Field form={$profileData} name="email">
+				<Form.Field form={updateProfileForm} name="email">
 					<Form.Control>
 						{#snippet children({ props })}
 							<Form.Label>Email</Form.Label>
@@ -63,7 +68,7 @@
 		</Card.Header>
 		<Card.Content>
 			<form method="POST" action="?/changePassword" use:passwordEnhance class="space-y-4">
-				<Form.Field form={$passwordData} name="currentPassword">
+				<Form.Field form={changePasswordForm} name="currentPassword">
 					<Form.Control>
 						{#snippet children({ props })}
 							<Form.Label>Current Password</Form.Label>
@@ -73,7 +78,7 @@
 					<Form.FieldErrors />
 				</Form.Field>
 
-				<Form.Field form={$passwordData} name="newPassword">
+				<Form.Field form={changePasswordForm} name="newPassword">
 					<Form.Control>
 						{#snippet children({ props })}
 							<Form.Label>New Password</Form.Label>
@@ -84,7 +89,7 @@
 					<Form.FieldErrors />
 				</Form.Field>
 
-				<Form.Field form={$passwordData} name="confirmPassword">
+				<Form.Field form={changePasswordForm} name="confirmPassword">
 					<Form.Control>
 						{#snippet children({ props })}
 							<Form.Label>Confirm Password</Form.Label>

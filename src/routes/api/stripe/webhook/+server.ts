@@ -1,11 +1,13 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types.js';
+import type Stripe from 'stripe';
 import { stripe } from '$lib/stripe.js';
 import { env } from '$env/dynamic/private';
 import { db } from '$lib/index.js';
-import { order, orderItem } from '../../../../db/schema.js';
-import { markProductsSold } from '$lib/inventory.js';
-import { eq } from 'drizzle-orm';
+import { artwork, order, orderItem } from '../../../../db/schema.js';
+import { markArtworksSold, releaseReservations } from '$lib/inventory.js';
+import { inArray } from 'drizzle-orm';
+import { nanoid } from 'nanoid';
 
 /**
  * Stripe Webhook Handler
@@ -18,6 +20,100 @@ import { eq } from 'drizzle-orm';
  *
  * For production, configure the webhook endpoint in Stripe Dashboard and use the production webhook secret.
  */
+
+function parseArtworkIds(session: Stripe.Checkout.Session): string[] {
+	try {
+		const parsed = JSON.parse(session.metadata?.artworkIds ?? '[]');
+		return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string') : [];
+	} catch (e) {
+		console.error('Failed to parse artworkIds metadata:', e);
+		return [];
+	}
+}
+
+function addressToJson(address: Stripe.Address | null | undefined): string {
+	return JSON.stringify({
+		street: [address?.line1, address?.line2].filter(Boolean).join(', '),
+		city: address?.city ?? '',
+		state: address?.state ?? '',
+		zip: address?.postal_code ?? '',
+		country: address?.country ?? ''
+	});
+}
+
+async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session): Promise<void> {
+	const artworkIds = parseArtworkIds(session);
+
+	// Mark the pieces sold (idempotent) — they stay published so the gallery
+	// can keep showing them with a SOLD badge.
+	if (artworkIds.length > 0) {
+		try {
+			await markArtworksSold(db, artworkIds);
+		} catch (err) {
+			console.error('Failed to mark artwork sold in webhook:', err);
+		}
+	}
+
+	const paymentIntentId =
+		typeof session.payment_intent === 'string'
+			? session.payment_intent
+			: (session.payment_intent?.id ?? session.id);
+
+	const shipping = session.collected_information?.shipping_details ?? null;
+	const customerName = session.customer_details?.name ?? shipping?.name ?? 'Unknown';
+	const shippingAddress = addressToJson(shipping?.address);
+	const billingAddress = session.customer_details?.address
+		? addressToJson(session.customer_details.address)
+		: shippingAddress;
+
+	try {
+		// Idempotency: paymentIntentId is unique, so a webhook retry is a no-op
+		const inserted = await db
+			.insert(order)
+			.values({
+				id: nanoid(),
+				paymentIntentId,
+				customerName,
+				customerEmail: session.customer_details?.email ?? '',
+				customerPhone: session.customer_details?.phone ?? null,
+				shippingAddress,
+				billingAddress,
+				total: ((session.amount_total ?? 0) / 100).toString(),
+				currency: (session.currency ?? 'usd').toUpperCase(),
+				status: 'completed'
+			})
+			.onConflictDoNothing({ target: order.paymentIntentId })
+			.returning({ id: order.id });
+
+		const orderId = inserted[0]?.id;
+
+		if (orderId && artworkIds.length > 0) {
+			const pieces = await db.select().from(artwork).where(inArray(artwork.id, artworkIds));
+			const piecesById = new Map(pieces.map((piece) => [piece.id, piece]));
+
+			await db.insert(orderItem).values(
+				artworkIds.map((artworkId) => {
+					const piece = piecesById.get(artworkId);
+					return {
+						id: nanoid(),
+						orderId,
+						productId: artworkId,
+						priceId: 'inline',
+						artworkId,
+						name: piece?.title ?? 'Artwork',
+						price: piece?.price ?? '0',
+						currency: (session.currency ?? 'usd').toUpperCase()
+					};
+				})
+			);
+		}
+
+		console.log('Order recorded for checkout session:', session.id);
+	} catch (err) {
+		console.error('Failed to record order in webhook:', err);
+	}
+}
+
 export const POST: RequestHandler = async ({ request }) => {
 	const body = await request.text();
 	const signature = request.headers.get('stripe-signature');
@@ -52,83 +148,21 @@ export const POST: RequestHandler = async ({ request }) => {
 
 	// Handle the event
 	switch (event.type) {
-		case 'payment_intent.created': {
-			// Payment intent was created - this is normal, no action needed
-			console.log('Payment intent created:', event.data.object.id);
+		case 'checkout.session.completed': {
+			const session = event.data.object;
+			console.log('Checkout session completed:', session.id);
+			await handleCheckoutSessionCompleted(session);
 			break;
 		}
-		case 'payment_intent.succeeded': {
-			const paymentIntent = event.data.object;
-			console.log('Payment intent succeeded:', paymentIntent.id);
-			// Update order status to completed if it exists
+		case 'checkout.session.expired': {
+			const session = event.data.object;
+			console.log('Checkout session expired:', session.id);
+			// The buyer abandoned checkout — give the pieces back (only ones still reserved)
 			try {
-				await db
-					.update(order)
-					.set({ status: 'completed' })
-					.where(eq(order.paymentIntentId, paymentIntent.id));
-				console.log('Order status updated to completed for payment intent:', paymentIntent.id);
+				await releaseReservations(db, parseArtworkIds(session));
 			} catch (err) {
-				console.error('Error updating order status:', err);
-				// Don't fail the webhook - order might not exist yet if webhook fires before form submission
+				console.error('Failed to release reservations in webhook:', err);
 			}
-
-			// Mark one-of-a-kind pieces sold (Stripe inactive + local artwork unpublished when linked)
-			try {
-				const productIds = new Set<string>();
-
-				if (paymentIntent.metadata?.cartItems) {
-					try {
-						const cartItems = JSON.parse(paymentIntent.metadata.cartItems) as Array<{
-							productId?: string;
-						}>;
-						for (const item of cartItems) {
-							if (item.productId) productIds.add(item.productId);
-						}
-					} catch (e) {
-						console.error('Failed to parse cartItems metadata in webhook:', e);
-					}
-				}
-
-				const orderRows = await db
-					.select({ id: order.id })
-					.from(order)
-					.where(eq(order.paymentIntentId, paymentIntent.id))
-					.limit(1);
-
-				if (orderRows[0]) {
-					const items = await db
-						.select({ productId: orderItem.productId })
-						.from(orderItem)
-						.where(eq(orderItem.orderId, orderRows[0].id));
-					for (const item of items) productIds.add(item.productId);
-				}
-
-				if (productIds.size > 0) {
-					await markProductsSold([...productIds]);
-				}
-			} catch (err) {
-				console.error('Failed to mark products sold in webhook:', err);
-			}
-			break;
-		}
-		case 'payment_intent.payment_failed': {
-			const paymentIntent = event.data.object;
-			console.log('Payment intent failed:', paymentIntent.id);
-			// Update order status to cancelled if it exists
-			try {
-				await db
-					.update(order)
-					.set({ status: 'cancelled' })
-					.where(eq(order.paymentIntentId, paymentIntent.id));
-			} catch (err) {
-				console.error('Error updating order status:', err);
-			}
-			break;
-		}
-		case 'charge.succeeded':
-		case 'charge.updated': {
-			// These events are informational - payment_intent.succeeded is the primary event we use
-			console.log(`Charge event received: ${event.type}`, (event.data.object as any).id);
 			break;
 		}
 		default:

@@ -9,56 +9,63 @@
 
 	let { data }: { data: PageData } = $props();
 
-	function handleAddToCart(price: (typeof data.product.prices)[0]) {
-		cart.addItem({
-			productId: data.product.id,
-			priceId: price.id,
-			name: data.product.name,
-			image: data.product.images?.[0] || null,
-			price: price.amount || 0,
-			currency: price.currency,
-			recurring: price.recurring
-		});
-	}
+	let selectedImage = $state(0);
 
-	function isInCart() {
-		// Check if product is already in cart (one-of-a-kind products)
-		// Access cart.items to ensure reactivity
-		return cart.items.some((item) => item.productId === data.product.id);
+	// Reset the gallery when navigating between pieces
+	$effect(() => {
+		void data.artwork.id;
+		selectedImage = 0;
+	});
+
+	const inCart = $derived(cart.items.some((item) => item.artworkId === data.artwork.id));
+
+	function handleAddToCart() {
+		cart.addItem({
+			artworkId: data.artwork.id,
+			title: data.artwork.title,
+			image: data.artwork.images[0] ?? null,
+			priceCents: data.artwork.priceCents ?? 0
+		});
 	}
 </script>
 
 <div class="container mx-auto px-4 py-8">
 	<Button variant="ghost" class="mb-6" onclick={() => goto('/products')}>
 		<ArrowLeft class="mr-2 size-4" />
-		Back to Products
+		Back to Gallery
 	</Button>
 
 	<div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-		<!-- Product Images -->
+		<!-- Image Gallery -->
 		<div class="space-y-4">
-			{#if data.product.images && data.product.images.length > 0}
+			{#if data.artwork.images.length > 0}
 				<div
 					class="aspect-square w-full overflow-hidden rounded-lg border bg-muted flex items-center justify-center"
 				>
 					<img
-						src={data.product.images[0]}
-						alt={data.product.name}
+						src={data.artwork.images[selectedImage]}
+						alt={data.artwork.title}
 						class="w-full h-full object-contain"
 					/>
 				</div>
-				{#if data.product.images.length > 1}
+				{#if data.artwork.images.length > 1}
 					<div class="grid grid-cols-4 gap-4">
-						{#each data.product.images.slice(1, 5) as image, index}
-							<div
-								class="aspect-square overflow-hidden rounded-lg border bg-muted flex items-center justify-center"
+						{#each data.artwork.images as image, index (image)}
+							<button
+								type="button"
+								class="aspect-square overflow-hidden rounded-lg border bg-muted flex items-center justify-center {index ===
+								selectedImage
+									? 'ring-2 ring-primary'
+									: ''}"
+								onclick={() => (selectedImage = index)}
+								aria-label={`Show image ${index + 1} of ${data.artwork.title}`}
 							>
 								<img
 									src={image}
-									alt={`${data.product.name} - Image ${index + 2}`}
+									alt={`${data.artwork.title} - Image ${index + 1}`}
 									class="w-full h-full object-contain cursor-pointer hover:opacity-75 transition-opacity"
 								/>
-							</div>
+							</button>
 						{/each}
 					</div>
 				{/if}
@@ -71,85 +78,64 @@
 			{/if}
 		</div>
 
-		<!-- Product Details -->
+		<!-- Piece Details -->
 		<div class="space-y-6">
 			<div>
-				<h1 class="text-4xl font-bold tracking-tight mb-4">{data.product.name}</h1>
-				{#if data.product.description}
+				<h1 class="text-4xl font-bold tracking-tight mb-4">{data.artwork.title}</h1>
+				{#if data.artwork.description}
 					<div class="prose prose-lg max-w-none">
-						<p class="text-muted-foreground whitespace-pre-line">{data.product.description}</p>
+						<p class="text-muted-foreground whitespace-pre-line">{data.artwork.description}</p>
 					</div>
 				{/if}
 			</div>
 
-			<!-- Pricing -->
-			{#if data.product.sold}
+			{#if data.artwork.status === 'sold'}
 				<Card.Root>
 					<Card.Content class="py-8 text-center">
 						<p class="text-lg font-medium">Sold</p>
-						<p class="text-muted-foreground mt-1">This one-of-a-kind piece is no longer available.</p>
+						<p class="text-muted-foreground mt-1">
+							This one-of-a-kind piece has found its collector.
+						</p>
 					</Card.Content>
 				</Card.Root>
-			{:else if data.product.prices.length > 0}
+			{:else if data.artwork.status === 'reserved'}
 				<Card.Root>
-					<Card.Header>
-						<Card.Title>Pricing</Card.Title>
-					</Card.Header>
-					<Card.Content class="space-y-4">
-						{#each data.product.prices as price}
-							<div class="flex items-center justify-between p-4 border rounded-lg">
-								<div>
-									<p class="font-semibold text-2xl">
-										{formatPrice(price.amount, price.currency)}
-									</p>
-									{#if price.recurring}
-										<p class="text-sm text-muted-foreground">
-											per {price.recurring.interval_count === 1
-												? price.recurring.interval
-												: `${price.recurring.interval_count} ${price.recurring.interval}s`}
-										</p>
-									{:else}
-										<p class="text-sm text-muted-foreground">One-time payment</p>
-									{/if}
-								</div>
-								{#if isInCart()}
-									<Button variant="outline" size="lg" disabled>
-										<Check class="mr-2 size-4" />
-										In Cart
-									</Button>
-								{:else}
-									<Button variant="default" size="lg" onclick={() => handleAddToCart(price)}>
-										<ShoppingCart class="mr-2 size-4" />
-										Add to Cart
-									</Button>
-								{/if}
+					<Card.Content class="py-8 text-center">
+						<p class="text-lg font-medium">Reserved — check back soon</p>
+						<p class="text-muted-foreground mt-1">
+							Someone has this piece in checkout right now. If they don't complete the purchase, it
+							will be available again shortly.
+						</p>
+					</Card.Content>
+				</Card.Root>
+			{:else if data.artwork.priceCents !== null}
+				<Card.Root>
+					<Card.Content>
+						<div class="flex items-center justify-between p-4 border rounded-lg">
+							<div>
+								<p class="font-semibold text-2xl">
+									{formatPrice(data.artwork.priceCents, 'usd')}
+								</p>
+								<p class="text-sm text-muted-foreground">One of a kind</p>
 							</div>
-						{/each}
+							{#if inCart}
+								<Button variant="outline" size="lg" disabled>
+									<Check class="mr-2 size-4" />
+									In Cart
+								</Button>
+							{:else}
+								<Button variant="default" size="lg" onclick={handleAddToCart}>
+									<ShoppingCart class="mr-2 size-4" />
+									Add to Cart
+								</Button>
+							{/if}
+						</div>
 					</Card.Content>
 				</Card.Root>
 			{:else}
 				<Card.Root>
 					<Card.Content class="py-8 text-center">
-						<p class="text-muted-foreground">No pricing available for this product.</p>
-					</Card.Content>
-				</Card.Root>
-			{/if}
-
-			<!-- Metadata -->
-			{#if data.product.metadata && Object.keys(data.product.metadata).filter((k) => k !== 'sold' && k !== 'soldAt').length > 0}
-				<Card.Root>
-					<Card.Header>
-						<Card.Title>Additional Information</Card.Title>
-					</Card.Header>
-					<Card.Content>
-						<dl class="space-y-2">
-							{#each Object.entries(data.product.metadata).filter(([key]) => key !== 'sold' && key !== 'soldAt') as [key, value]}
-								<div class="flex justify-between">
-									<dt class="font-medium capitalize">{key.replace(/_/g, ' ')}:</dt>
-									<dd class="text-muted-foreground">{value}</dd>
-								</div>
-							{/each}
-						</dl>
+						<p class="text-muted-foreground">No pricing available for this piece.</p>
 					</Card.Content>
 				</Card.Root>
 			{/if}

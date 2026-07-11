@@ -6,8 +6,8 @@
 	import { Trash2, ShoppingBag } from '@lucide/svelte';
 	import { goto } from '$app/navigation';
 
-	function handleRemoveItem(productId: string) {
-		cart.removeItem(productId);
+	function handleRemoveItem(artworkId: string) {
+		cart.removeItem(artworkId);
 	}
 
 	function handleClearCart() {
@@ -16,32 +16,15 @@
 		}
 	}
 
-	function getTotalCurrency() {
-		if (cart.items.length === 0) return 'USD';
-		// Note: Assumes all items have the same currency
-		// If multi-currency support is needed, totals should be grouped by currency
-		return cart.items[0].currency;
-	}
-
 	function handleCheckout() {
-		// Only pass priceId, productId, and quantity - prices will be validated server-side
-		const cartData = encodeURIComponent(
-			JSON.stringify(
-				cart.items.map((item) => ({
-					productId: item.productId,
-					priceId: item.priceId,
-					quantity: item.quantity
-				}))
-			)
-		);
-		goto(`/checkout?cart=${cartData}`);
+		goto('/checkout');
 	}
 </script>
 
 <div class="container mx-auto px-4 py-8">
 	<div class="mb-8">
 		<h1 class="text-4xl font-bold tracking-tight mb-2">Shopping Cart</h1>
-		<p class="text-muted-foreground">Review your items before checkout</p>
+		<p class="text-muted-foreground">Review your pieces before checkout</p>
 	</div>
 
 	{#if cart.isEmpty}
@@ -49,39 +32,32 @@
 			<Card.Content class="py-12 text-center">
 				<ShoppingBag class="size-12 mx-auto mb-4 text-muted-foreground" />
 				<p class="text-lg font-medium mb-2">Your cart is empty</p>
-				<p class="text-muted-foreground mb-6">Start adding products to your cart</p>
-				<Button onclick={() => goto('/products')}>Browse Products</Button>
+				<p class="text-muted-foreground mb-6">Browse the gallery to find your piece</p>
+				<Button onclick={() => goto('/products')}>Browse Gallery</Button>
 			</Card.Content>
 		</Card.Root>
 	{:else}
 		<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
 			<!-- Cart Items -->
 			<div class="lg:col-span-2 space-y-4">
-				{#each cart.items as item}
+				{#each cart.items as item (item.artworkId)}
 					<Card.Root>
 						<Card.Content class="p-6">
 							<div class="flex gap-4">
 								{#if item.image}
 									<div class="w-24 h-24 shrink-0 overflow-hidden rounded-lg border bg-muted">
-										<img src={item.image} alt={item.name} class="w-full h-full object-contain" />
+										<img src={item.image} alt={item.title} class="w-full h-full object-contain" />
 									</div>
 								{/if}
 								<div class="flex-1 min-w-0">
-									<h3 class="font-semibold text-lg mb-1">{item.name}</h3>
+									<h3 class="font-semibold text-lg mb-1">{item.title}</h3>
 									<p class="text-muted-foreground mb-4">
-										{formatPrice(item.price, item.currency)}
-										{#if item.recurring}
-											<span class="text-sm">
-												/ {item.recurring.interval_count === 1
-													? item.recurring.interval
-													: `${item.recurring.interval_count} ${item.recurring.interval}s`}
-											</span>
-										{/if}
+										{formatPrice(item.priceCents, 'usd')}
 									</p>
 									<Button
 										variant="ghost"
 										size="sm"
-										onclick={() => handleRemoveItem(item.productId)}
+										onclick={() => handleRemoveItem(item.artworkId)}
 									>
 										<Trash2 class="mr-2 size-4" />
 										Remove
@@ -89,7 +65,7 @@
 								</div>
 								<div class="text-right">
 									<p class="font-semibold text-lg">
-										{formatPrice(item.price, item.currency)}
+										{formatPrice(item.priceCents, 'usd')}
 									</p>
 								</div>
 							</div>
@@ -112,7 +88,7 @@
 						<div class="space-y-2">
 							<div class="flex justify-between text-sm">
 								<span class="text-muted-foreground">Subtotal</span>
-								<span>{formatPrice(cart.total, getTotalCurrency())}</span>
+								<span>{formatPrice(cart.total, 'usd')}</span>
 							</div>
 							<div class="flex justify-between text-sm">
 								<span class="text-muted-foreground">Items</span>
@@ -122,7 +98,7 @@
 						<div class="border-t pt-4">
 							<div class="flex justify-between text-lg font-semibold mb-4">
 								<span>Total</span>
-								<span>{formatPrice(cart.total, getTotalCurrency())}</span>
+								<span>{formatPrice(cart.total, 'usd')}</span>
 							</div>
 							<Button class="w-full" size="lg" onclick={handleCheckout}>Checkout</Button>
 						</div>

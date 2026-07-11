@@ -1,94 +1,143 @@
-import { and, eq, inArray, ne } from 'drizzle-orm';
-import { stripe } from '$lib/stripe.js';
-import { db } from '$lib/index.js';
-import { artwork, order, orderItem } from '../db/schema.js';
+import { and, eq, inArray, lt, sql } from 'drizzle-orm';
+import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
+import * as schema from '../db/schema.js';
+import { artwork } from '../db/schema.js';
 
 /**
  * One-of-a-kind inventory helpers.
- * Storefront catalog is Stripe products (`active`); local `artwork.published` is kept in sync when IDs align.
+ *
+ * The local `artwork` table is the single source of truth:
+ * - `status` is one of 'available' | 'reserved' | 'sold'
+ * - a piece is reserved for RESERVATION_MINUTES while a checkout session is open
+ * - expired reservations are released lazily (storefront loads) and on
+ *   `checkout.session.expired` webhooks
+ *
+ * All helpers take the db client as an argument so they can be exercised
+ * against a test database.
  */
 
-export async function assertProductsAvailable(productIds: string[]): Promise<void> {
-	const uniqueIds = [...new Set(productIds.filter(Boolean))];
-	if (uniqueIds.length === 0) return;
+export type InventoryDb = NodePgDatabase<typeof schema>;
 
-	for (const productId of uniqueIds) {
-		const product = await stripe.products.retrieve(productId);
-		if (!product.active || product.metadata?.sold === 'true') {
-			throw new Error(`"${product.name}" is no longer available.`);
-		}
+export const RESERVATION_MINUTES = 30;
+
+export class ArtworkUnavailableError extends Error {
+	unavailable: Array<{ id: string; title: string; status: string }>;
+
+	constructor(unavailable: Array<{ id: string; title: string; status: string }>) {
+		const titles = unavailable.map((a) => `"${a.title}"`).join(', ');
+		const sold = unavailable.some((a) => a.status === 'sold');
+		super(
+			sold
+				? `Sorry — ${titles} ${unavailable.length === 1 ? 'has' : 'have'} just been sold. Each piece is one of a kind.`
+				: `Sorry — ${titles} ${unavailable.length === 1 ? 'is' : 'are'} reserved by another collector right now. Check back soon.`
+		);
+		this.name = 'ArtworkUnavailableError';
+		this.unavailable = unavailable;
 	}
-
-	await assertNotSoldInCompletedOrders(uniqueIds);
 }
 
 /**
- * Post-payment check: allow the current PaymentIntent to finish even if webhook
- * already deactivated the Stripe product, but block if another completed order owns it.
+ * Lazily release reservations whose hold window has passed.
+ * Called on storefront loads so abandoned checkouts free up pieces.
  */
-export async function assertNotSoldToSomeoneElse(
-	productIds: string[],
-	paymentIntentId: string
-): Promise<void> {
-	const uniqueIds = [...new Set(productIds.filter(Boolean))];
-	if (uniqueIds.length === 0) return;
-
-	await assertNotSoldInCompletedOrders(uniqueIds, paymentIntentId);
+export async function releaseExpiredReservations(db: InventoryDb): Promise<void> {
+	await db
+		.update(artwork)
+		.set({ status: 'available', reservedUntil: null })
+		.where(and(eq(artwork.status, 'reserved'), lt(artwork.reservedUntil, new Date())));
 }
 
-async function assertNotSoldInCompletedOrders(
-	productIds: string[],
-	excludePaymentIntentId?: string
-): Promise<void> {
-	const conditions = [inArray(orderItem.productId, productIds), eq(order.status, 'completed')];
-	if (excludePaymentIntentId) {
-		conditions.push(ne(order.paymentIntentId, excludePaymentIntentId));
-	}
+/**
+ * Atomically reserve a set of one-of-a-kind pieces for checkout.
+ *
+ * Inside a single transaction:
+ * 1. expired reservations on the requested pieces are released
+ * 2. one UPDATE reserves every requested piece that is published and available,
+ *    returning the ids it managed to reserve
+ * 3. if any piece could not be reserved, the transaction is rolled back
+ *    (releasing anything reserved in step 2) and ArtworkUnavailableError is
+ *    thrown describing which pieces were just sold or reserved
+ */
+export async function reserveArtworks(db: InventoryDb, artworkIds: string[]): Promise<string[]> {
+	const ids = [...new Set(artworkIds.filter(Boolean))];
+	if (ids.length === 0) return [];
 
-	const soldRows = await db
-		.select({ productId: orderItem.productId })
-		.from(orderItem)
-		.innerJoin(order, eq(orderItem.orderId, order.id))
-		.where(and(...conditions));
-
-	if (soldRows.length > 0) {
-		throw new Error(`One or more pieces in your cart have already been sold.`);
-	}
-}
-
-export async function markProductsSold(productIds: string[]): Promise<void> {
-	const uniqueIds = [...new Set(productIds.filter(Boolean))];
-	if (uniqueIds.length === 0) return;
-
-	const artworkIds = new Set<string>(uniqueIds);
-
-	await Promise.all(
-		uniqueIds.map(async (productId) => {
-			try {
-				const product = await stripe.products.retrieve(productId);
-				if (product.metadata?.artworkId) {
-					artworkIds.add(product.metadata.artworkId);
-				}
-				await stripe.products.update(productId, {
-					active: false,
-					metadata: {
-						...product.metadata,
-						sold: 'true',
-						soldAt: new Date().toISOString()
-					}
-				});
-			} catch (err) {
-				console.error(`Failed to mark Stripe product ${productId} as sold:`, err);
-			}
-		})
-	);
-
-	try {
-		await db
+	return await db.transaction(async (tx) => {
+		// Lazy release: an expired hold on a requested piece should not block it
+		await tx
 			.update(artwork)
-			.set({ published: false })
-			.where(inArray(artwork.id, [...artworkIds]));
-	} catch (err) {
-		console.error('Failed to unpublish local artwork after sale:', err);
-	}
+			.set({ status: 'available', reservedUntil: null })
+			.where(
+				and(
+					inArray(artwork.id, ids),
+					eq(artwork.status, 'reserved'),
+					lt(artwork.reservedUntil, new Date())
+				)
+			);
+
+		const reserved = await tx
+			.update(artwork)
+			.set({
+				status: 'reserved',
+				reservedUntil: sql`now() + (${RESERVATION_MINUTES} * interval '1 minute')`
+			})
+			.where(
+				and(inArray(artwork.id, ids), eq(artwork.status, 'available'), eq(artwork.published, true))
+			)
+			.returning({ id: artwork.id });
+
+		if (reserved.length !== ids.length) {
+			const reservedIds = new Set(reserved.map((r) => r.id));
+			const missingIds = ids.filter((id) => !reservedIds.has(id));
+			const missing = await tx
+				.select({ id: artwork.id, title: artwork.title, status: artwork.status })
+				.from(artwork)
+				.where(inArray(artwork.id, missingIds));
+			// Cover ids that don't exist at all / are unpublished
+			const found = new Set(missing.map((m) => m.id));
+			for (const id of missingIds) {
+				if (!found.has(id)) missing.push({ id, title: 'One of the pieces', status: 'unavailable' });
+			}
+			// Throwing rolls back the transaction, releasing anything reserved above
+			throw new ArtworkUnavailableError(missing);
+		}
+
+		return reserved.map((r) => r.id);
+	});
+}
+
+/**
+ * Release reservations that we hold (e.g. `checkout.session.expired` webhook).
+ * Only touches pieces still marked 'reserved' — sold pieces stay sold.
+ */
+export async function releaseReservations(db: InventoryDb, artworkIds: string[]): Promise<void> {
+	const ids = [...new Set(artworkIds.filter(Boolean))];
+	if (ids.length === 0) return;
+
+	await db
+		.update(artwork)
+		.set({ status: 'available', reservedUntil: null })
+		.where(and(inArray(artwork.id, ids), eq(artwork.status, 'reserved')));
+}
+
+/**
+ * Mark pieces sold after a completed checkout. Pieces stay published so they
+ * remain visible in the gallery with a SOLD badge.
+ */
+export async function markArtworksSold(db: InventoryDb, artworkIds: string[]): Promise<void> {
+	const ids = [...new Set(artworkIds.filter(Boolean))];
+	if (ids.length === 0) return;
+
+	await db
+		.update(artwork)
+		.set({ status: 'sold', reservedUntil: null })
+		.where(inArray(artwork.id, ids));
+}
+
+/** Convert a numeric(10,2) dollars string from the db to integer cents. */
+export function dollarsToCents(price: string | null): number | null {
+	if (price === null || price === undefined || price === '') return null;
+	const parsed = Number.parseFloat(price);
+	if (Number.isNaN(parsed)) return null;
+	return Math.round(parsed * 100);
 }
