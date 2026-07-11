@@ -4,6 +4,7 @@ import { r2Client, BUCKET_NAME } from '$lib/r2';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { v4 as uuidv4 } from 'uuid';
 import { auth } from '$lib/auth';
+import { isAdmin } from '$lib/server/admin';
 
 export const POST: RequestHandler = async ({ request }) => {
 	// Check authentication
@@ -13,6 +14,10 @@ export const POST: RequestHandler = async ({ request }) => {
 
 	if (!session?.user) {
 		return error(401, 'Unauthorized');
+	}
+	// Uploads are seller-only: signed-in ≠ allowed to write to the bucket.
+	if (!isAdmin(session.user.email)) {
+		return error(403, 'The dashboard is for the artist.');
 	}
 
 	try {
@@ -65,4 +70,3 @@ export const POST: RequestHandler = async ({ request }) => {
 		return error(500, 'Failed to upload file');
 	}
 };
-
