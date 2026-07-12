@@ -7,7 +7,7 @@
 		class: className,
 		children,
 		...restProps
-	}: WithElementRef<HTMLFieldsetAttributes> = $props();
+	}: WithElementRef<HTMLFieldsetAttributes, HTMLFieldSetElement> = $props();
 </script>
 
 <fieldset

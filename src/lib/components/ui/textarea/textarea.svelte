@@ -8,7 +8,7 @@
 		class: className,
 		'data-slot': dataSlot = 'textarea',
 		...restProps
-	}: WithoutChildren<WithElementRef<HTMLTextareaAttributes>> = $props();
+	}: WithoutChildren<WithElementRef<HTMLTextareaAttributes, HTMLTextAreaElement>> = $props();
 </script>
 
 <textarea
