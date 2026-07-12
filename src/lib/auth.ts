@@ -5,6 +5,7 @@ import { getRequestEvent } from '$app/server';
 import { env } from '$env/dynamic/private';
 import { db } from './index';
 import { sendEmail } from './server/email';
+import { escapeHtml } from './server/html';
 
 export const auth = betterAuth({
 	database: drizzleAdapter(db, {
@@ -14,12 +15,17 @@ export const auth = betterAuth({
 	baseURL: env.BETTER_AUTH_URL || 'http://localhost:5173',
 	emailAndPassword: {
 		enabled: true,
+		// Block sign-in until the address is verified. Without this, anyone
+		// could sign up with an ADMIN_EMAILS address (or a buyer's address) and
+		// get a session carrying an email they don't own. A failed sign-in on
+		// an unverified account re-sends the verification email automatically.
+		requireEmailVerification: true,
 		sendResetPassword: async ({ user, url }) => {
 			await sendEmail({
 				to: user.email,
 				subject: 'Reset your Dead & Tattooed password',
 				text: `Someone (hopefully you) asked to reset the password for ${user.email}.\n\nReset it here: ${url}\n\nIf this wasn't you, ignore this email — nothing changes.`,
-				html: `<p>Someone (hopefully you) asked to reset the password for <b>${user.email}</b>.</p><p><a href="${url}">Reset your password</a></p><p>If this wasn't you, ignore this email — nothing changes.</p>`
+				html: `<p>Someone (hopefully you) asked to reset the password for <b>${escapeHtml(user.email)}</b>.</p><p><a href="${escapeHtml(url)}">Reset your password</a></p><p>If this wasn't you, ignore this email — nothing changes.</p>`
 			});
 		}
 	},
@@ -34,7 +40,7 @@ export const auth = betterAuth({
 				to: user.email,
 				subject: 'Verify your Dead & Tattooed email',
 				text: `Confirm this address to activate your account: ${url}\n\nIf you didn't create an account, ignore this.`,
-				html: `<p>Confirm this address to activate your Dead &amp; Tattooed account:</p><p><a href="${url}">Verify email</a></p><p>If you didn't create an account, ignore this.</p>`
+				html: `<p>Confirm this address to activate your Dead &amp; Tattooed account:</p><p><a href="${escapeHtml(url)}">Verify email</a></p><p>If you didn't create an account, ignore this.</p>`
 			});
 		}
 	},

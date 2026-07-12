@@ -1,5 +1,5 @@
-import { fail, redirect } from '@sveltejs/kit';
-import { isAdmin } from '$lib/server/admin';
+import { fail } from '@sveltejs/kit';
+import { requireAdmin } from '$lib/server/admin';
 import type { PageServerLoad, Actions } from './$types';
 import { db } from '$lib/index';
 import { artwork, order, orderItem, subscriber } from '../../db/schema';
@@ -21,16 +21,20 @@ function readPublished(value: FormDataEntryValue | null): boolean {
 	return value === 'true' || value === 'on';
 }
 
+/** Parse the images form field into a plain string array (drop anything else). */
+function readImages(value: string | undefined): string[] {
+	const parsed = value ? JSON.parse(value) : [];
+	return Array.isArray(parsed) ? parsed.filter((v): v is string => typeof v === 'string') : [];
+}
+
 export const load: PageServerLoad = async ({ locals }) => {
-	if (!locals.user || !isAdmin(locals.user.email)) {
-		throw redirect(302, '/auth');
-	}
+	const user = requireAdmin(locals);
 
 	// Fetch user's artwork (stable ordering: oldest first, matching creation order)
 	const artworks = (await db
 		.select()
 		.from(artwork)
-		.where(eq(artwork.userId, locals.user.id))
+		.where(eq(artwork.userId, user.id))
 		.orderBy(artwork.createdAt)) as ArtworkRow[];
 
 	const artworkIds = artworks.map((a) => a.id);
@@ -77,9 +81,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 export const actions: Actions = {
 	create: async ({ request, locals }) => {
-		if (!locals.user || !isAdmin(locals.user.email)) {
-			return fail(401, { error: 'Unauthorized' });
-		}
+		const user = requireAdmin(locals);
 
 		const formData = await request.formData();
 		const title = formData.get('title')?.toString();
@@ -93,7 +95,7 @@ export const actions: Actions = {
 		}
 
 		try {
-			const imageArray = images ? JSON.parse(images) : [];
+			const imageArray = readImages(images);
 
 			const values: typeof artwork.$inferInsert & ArtworkExtras = {
 				id: nanoid(),
@@ -102,7 +104,7 @@ export const actions: Actions = {
 				description,
 				images: imageArray,
 				published,
-				userId: locals.user.id
+				userId: user.id
 			};
 
 			await db.insert(artwork).values(values);
@@ -114,9 +116,7 @@ export const actions: Actions = {
 	},
 
 	update: async ({ request, locals }) => {
-		if (!locals.user || !isAdmin(locals.user.email)) {
-			return fail(401, { error: 'Unauthorized' });
-		}
+		requireAdmin(locals);
 
 		const formData = await request.formData();
 		const id = formData.get('id')?.toString();
@@ -131,7 +131,7 @@ export const actions: Actions = {
 		}
 
 		try {
-			const imageArray = images ? JSON.parse(images) : [];
+			const imageArray = readImages(images);
 
 			const values: Partial<typeof artwork.$inferInsert> & ArtworkExtras = {
 				title,
@@ -150,9 +150,7 @@ export const actions: Actions = {
 	},
 
 	delete: async ({ request, locals }) => {
-		if (!locals.user || !isAdmin(locals.user.email)) {
-			return fail(401, { error: 'Unauthorized' });
-		}
+		requireAdmin(locals);
 
 		const formData = await request.formData();
 		const id = formData.get('id')?.toString();
@@ -171,9 +169,7 @@ export const actions: Actions = {
 	},
 
 	announce: async ({ request, locals, url }) => {
-		if (!locals.user || !isAdmin(locals.user.email)) {
-			return fail(401, { error: 'Unauthorized' });
-		}
+		requireAdmin(locals);
 
 		const formData = await request.formData();
 		const id = formData.get('id')?.toString();

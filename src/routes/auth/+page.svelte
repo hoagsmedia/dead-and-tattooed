@@ -1,11 +1,11 @@
 <script lang="ts">
-	import type { PageData } from './$types.js';
+	import type { PageData, ActionData } from './$types.js';
 	import SigninForm from './signin-form.svelte';
 	import SignupForm from './signup-form.svelte';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
 
-	let { data }: { data: PageData } = $props();
+	let { data, form }: { data: PageData; form: ActionData } = $props();
 	let tabValue = $state('signin');
 </script>
 
@@ -25,6 +25,11 @@
 					<SigninForm {data} />
 				</Tabs.Content>
 				<Tabs.Content value="signup" class="mt-6">
+					{#if form && 'verificationSent' in form && form.verificationSent}
+						<p class="mb-4 text-sm text-muted-foreground" data-testid="verification-sent">
+							Account created — check your email for the verification link, then sign in.
+						</p>
+					{/if}
 					<SignupForm {data} />
 				</Tabs.Content>
 			</Tabs.Root>
