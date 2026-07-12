@@ -43,6 +43,13 @@
       "when": 1783823292926,
       "tag": "0005_fulfillment_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1783828982435,
+      "tag": "0006_auth_rate_limit",
+      "breakpoints": true
     }
   ]
 }

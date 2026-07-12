@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, boolean, numeric, integer } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, boolean, numeric, integer, bigint } from 'drizzle-orm/pg-core';
 
 export const user = pgTable('user', {
 	id: text('id').primaryKey(),
@@ -122,4 +122,13 @@ export const orderItem = pgTable('order_item', {
 	price: numeric('price', { precision: 10, scale: 2 }).notNull(),
 	currency: text('currency').notNull().default('usd'),
 	createdAt: timestamp('created_at').defaultNow().notNull()
+});
+
+// Better Auth rate-limit store (rateLimit.storage: 'database'). Durable across
+// serverless instances so reset/verify-email throttles actually hold on Vercel.
+export const rateLimit = pgTable('rate_limit', {
+	id: text('id').primaryKey(),
+	key: text('key'),
+	count: integer('count'),
+	lastRequest: bigint('last_request', { mode: 'number' })
 });

@@ -44,6 +44,21 @@ export const auth = betterAuth({
 			});
 		}
 	},
+	rateLimit: {
+		// Enabled in all environments (Better Auth defaults it on only in
+		// production) with a durable DB store so the throttle survives across
+		// serverless instances. Built-in special rules already cap sign-in/
+		// sign-up/change-password/change-email at 3/10s; these customRules add
+		// the reset-password + send-verification email paths, which are the
+		// unauthenticated inbox-spam surface (HOA-553).
+		enabled: true,
+		storage: 'database',
+		customRules: {
+			'/forget-password': { window: 3600, max: 3 },
+			'/request-password-reset': { window: 3600, max: 3 },
+			'/send-verification-email': { window: 3600, max: 3 }
+		}
+	},
 	// Uncomment and configure social providers when ready:
 	// socialProviders: {
 	// 	github: {
