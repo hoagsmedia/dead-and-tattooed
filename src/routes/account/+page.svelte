@@ -82,6 +82,26 @@
 						</div>
 					</Card.Header>
 					<Card.Content class="space-y-3">
+						{#if o.status === 'shipped' && o.trackingNumber}
+							<p class="text-sm text-muted-foreground" data-testid="order-shipped-line">
+								Shipped{o.shippedAt ? ` ${fmtDate(o.shippedAt)}` : ''}{o.carrier
+									? ` via ${o.carrier}`
+									: ''}
+								—
+								{#if o.trackingUrl}
+									<a
+										href={o.trackingUrl}
+										target="_blank"
+										rel="noopener noreferrer"
+										class="text-primary underline-offset-4 hover:underline"
+									>
+										{o.trackingNumber}
+									</a>
+								{:else}
+									tracking {o.trackingNumber}
+								{/if}
+							</p>
+						{/if}
 						{#each o.items as item, i (i)}
 							<div class="flex items-center gap-3">
 								{#if item.image}

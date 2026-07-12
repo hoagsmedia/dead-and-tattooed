@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { Instagram } from '@lucide/svelte';
+	import NotifyForm from './Notify-Form.svelte';
 
 	const year = new Date().getFullYear();
 </script>
@@ -19,6 +20,9 @@
 			<p class="text-xs text-muted-foreground/80">
 				&copy; {year} Dead &amp; Tattooed. Real ink. Real preservation. Real weird.
 			</p>
+			<div class="pt-2">
+				<NotifyForm heading="New drops, no spam" />
+			</div>
 		</div>
 
 		<nav class="flex gap-12 text-sm" aria-label="Footer">

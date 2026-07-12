@@ -90,7 +90,11 @@ export const order = pgTable('order', {
 	billingAddress: text('billing_address').notNull(), // JSON string
 	total: numeric('total', { precision: 10, scale: 2 }).notNull(),
 	currency: text('currency').notNull().default('usd'),
-	status: text('status').notNull().default('pending'), // pending, completed, cancelled
+	status: text('status').notNull().default('pending'), // pending, completed, shipped, cancelled
+	// Fulfillment: set together when the artist marks the order shipped.
+	shippedAt: timestamp('shipped_at'),
+	trackingNumber: text('tracking_number'),
+	carrier: text('carrier'),
 	createdAt: timestamp('created_at').defaultNow().notNull(),
 	updatedAt: timestamp('updated_at')
 		.defaultNow()
