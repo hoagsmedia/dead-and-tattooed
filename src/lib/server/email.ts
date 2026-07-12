@@ -34,7 +34,12 @@ export async function sendEmail(input: {
 		})
 	});
 	if (!res.ok) {
-		console.error(`[email] Resend send failed (${res.status}): ${await res.text()}`);
+		// Log the body too: for reset/verification emails it carries the action
+		// link, so a failed send (e.g. domain not yet verified) is still
+		// rescuable from the function logs.
+		console.error(
+			`[email] Resend send failed (${res.status}): ${await res.text()} — undelivered to=${input.to} subject="${input.subject}"\n${input.text}`
+		);
 		return { sent: false };
 	}
 	return { sent: true };
