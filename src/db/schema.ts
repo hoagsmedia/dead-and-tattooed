@@ -98,6 +98,14 @@ export const order = pgTable('order', {
 		.notNull()
 });
 
+export const subscriber = pgTable('subscriber', {
+	id: text('id').primaryKey(),
+	email: text('email').notNull().unique(),
+	// One-click unsubscribe: token in every announcement link.
+	unsubscribeToken: text('unsubscribe_token').notNull(),
+	createdAt: timestamp('created_at').defaultNow().notNull()
+});
+
 export const orderItem = pgTable('order_item', {
 	id: text('id').primaryKey(),
 	orderId: text('order_id')
