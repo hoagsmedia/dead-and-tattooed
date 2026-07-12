@@ -7,7 +7,7 @@
 	import SiteFooter from './Components/Site-Footer.svelte';
 	injectAnalytics();
 
-	let { children }: { data: LayoutData; children: import('svelte').Snippet } = $props();
+	let { data, children }: { data: LayoutData; children: import('svelte').Snippet } = $props();
 
 	const ogImage = $derived(new URL('/deadandtattooed.png', page.url.origin).href);
 </script>
@@ -20,7 +20,7 @@
 </svelte:head>
 
 <div class="flex min-h-screen flex-col">
-	<SiteHeader />
+	<SiteHeader admin={data.admin} />
 	<main class="flex-1">
 		<div
 			class="mx-auto flex max-w-5xl flex-col items-center justify-center px-4 py-8 sm:px-6 lg:px-8"

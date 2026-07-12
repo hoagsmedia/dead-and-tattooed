@@ -1,9 +1,9 @@
 import type { LayoutServerLoad } from './$types.js';
-import { auth } from '$lib/auth.js';
+import { isAdmin } from '$lib/server/admin';
 
 export const load: LayoutServerLoad = async ({ locals }) => {
 	return {
-		user: locals.user || null
+		user: locals.user || null,
+		admin: isAdmin(locals.user?.email)
 	};
 };
-
