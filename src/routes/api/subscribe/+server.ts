@@ -3,11 +3,17 @@ import type { RequestHandler } from './$types.js';
 import { z } from 'zod';
 import { db } from '$lib/index.js';
 import { subscribe } from '$lib/server/announce.js';
+import { rateLimit } from '$lib/server/rate-limit.js';
 
 const emailSchema = z.email().max(254);
 
+/** Per-IP throttle: plenty for a human fixing typos, hostile to loops. */
+const RATE_LIMIT_MAX = 5;
+const RATE_LIMIT_WINDOW_MS = 60_000;
+
 /**
  * Public "notify me" signup. Anti-abuse posture:
+ * - per-IP in-memory rate limit (per-instance on serverless — see rate-limit.ts)
  * - `website` is a honeypot: humans never see it, bots fill it → pretend
  *   success and store nothing.
  * - The success response is identical whether the email was new or already
@@ -18,7 +24,20 @@ const GENERIC_OK = {
 	message: "You're on the list — occasional drop emails only. Unsubscribe anytime."
 };
 
-export const POST: RequestHandler = async ({ request }) => {
+export const POST: RequestHandler = async ({ request, getClientAddress }) => {
+	let ip = 'unknown';
+	try {
+		ip = getClientAddress();
+	} catch {
+		// Some adapters can't resolve an address; throttle those under one key.
+	}
+	if (!rateLimit(`subscribe:${ip}`, RATE_LIMIT_MAX, RATE_LIMIT_WINDOW_MS)) {
+		return json(
+			{ ok: false, message: 'Too many attempts — try again in a minute.' },
+			{ status: 429 }
+		);
+	}
+
 	let email: string | undefined;
 	let honeypot: string | undefined;
 
