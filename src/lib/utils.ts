@@ -15,4 +15,5 @@ export function formatPrice(amount: number | null, currency: string): string {
 
 export type WithoutChild<T> = Omit<T, 'children'>;
 export type WithoutChildren<T> = Omit<T, 'children'>;
-export type WithElementRef<T> = T & { ref?: HTMLDivElement | null };
+export type WithoutChildrenOrChild<T> = Omit<T, 'children' | 'child'>;
+export type WithElementRef<T, U extends HTMLElement = HTMLDivElement> = T & { ref?: U | null };
