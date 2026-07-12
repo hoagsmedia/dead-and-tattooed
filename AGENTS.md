@@ -20,3 +20,9 @@ use cloudflare r2 for image storage [https://developers.cloudflare.com/developer
 7. **(either) Old `src/lib/components/navbar.svelte`** is unused after the new Site-Header — delete it.
 
 Conventions: match existing code style; never share a checkout (worktrees); gates = check (Δ0 vs baseline) + vitest green + prettier on your files.
+
+## Staging: dev.deadandtattooed.com (2026-07-12)
+
+Live staging site — the `dev` git branch auto-serves at https://dev.deadandtattooed.com (Vercel domain bound to branch `dev`; Deployment Protection is OFF so it's publicly viewable). Runs on its OWN isolated Neon branch (`dev`, br-steep-union-ad6zlfgy — a copy-on-write fork of prod, disposable/reset-from-parent anytime), and its own preview-scoped env (BETTER_AUTH_URL=https://dev.deadandtattooed.com; `dev` host is in `trustedOrigins`). It will NEVER touch prod data.
+
+**Flow:** land a change on main → `git push origin main:dev` (or reset `dev` to main) → `vercel deploy` (preview) → `vercel alias set <url> dev.deadandtattooed.com` → phone-test → prod deploy. (dev was force-updated from the stale pre-v2 branch 71c5833 on 2026-07-12.) STRIPE_WEBHOOK_SECRET is intentionally absent on staging (no webhook there).
