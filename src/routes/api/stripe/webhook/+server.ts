@@ -72,17 +72,18 @@ async function notifyOwners(
 	});
 }
 
+/**
+ * Money has moved when this runs, so DB failures must NOT be swallowed:
+ * throwing bubbles to a 500, Stripe retries, and every write here is
+ * idempotent (status update + insert with a unique paymentIntentId).
+ */
 async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session): Promise<void> {
 	const artworkIds = parseArtworkIds(session);
 
 	// Mark the pieces sold (idempotent) — they stay published so the gallery
 	// can keep showing them with a SOLD badge.
 	if (artworkIds.length > 0) {
-		try {
-			await markArtworksSold(db, artworkIds);
-		} catch (err) {
-			console.error('Failed to mark artwork sold in webhook:', err);
-		}
+		await markArtworksSold(db, artworkIds);
 	}
 
 	const paymentIntentId =
@@ -97,9 +98,11 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session):
 		? addressToJson(session.customer_details.address)
 		: shippingAddress;
 
-	try {
+	// Order + items land atomically: a retry after a partial failure would
+	// otherwise hit the paymentIntentId conflict and leave the order item-less.
+	const { orderId, emailItems } = await db.transaction(async (tx) => {
 		// Idempotency: paymentIntentId is unique, so a webhook retry is a no-op
-		const inserted = await db
+		const inserted = await tx
 			.insert(order)
 			.values({
 				id: nanoid(),
@@ -120,10 +123,10 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session):
 		const emailItems: OrderEmailItem[] = [];
 
 		if (orderId && artworkIds.length > 0) {
-			const pieces = await db.select().from(artwork).where(inArray(artwork.id, artworkIds));
+			const pieces = await tx.select().from(artwork).where(inArray(artwork.id, artworkIds));
 			const piecesById = new Map(pieces.map((piece) => [piece.id, piece]));
 
-			await db.insert(orderItem).values(
+			await tx.insert(orderItem).values(
 				artworkIds.map((artworkId) => {
 					const piece = piecesById.get(artworkId);
 					const name = piece?.title ?? 'Artwork';
@@ -143,26 +146,26 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session):
 			);
 		}
 
-		console.log('Order recorded for checkout session:', session.id);
+		return { orderId, emailItems };
+	});
 
-		// Only on first insert (orderId is undefined on webhook retries), and
-		// never let a mail hiccup bounce the webhook back to Stripe.
-		if (orderId) {
-			try {
-				await notifyOwners({
-					items: emailItems,
-					buyerName: customerName,
-					buyerEmail: session.customer_details?.email ?? '',
-					shippingAddress,
-					total: ((session.amount_total ?? 0) / 100).toFixed(2),
-					currency: (session.currency ?? 'usd').toUpperCase()
-				});
-			} catch (err) {
-				console.error('Failed to send new-order notification:', err);
-			}
+	console.log('Order recorded for checkout session:', session.id);
+
+	// Only on first insert (orderId is undefined on webhook retries), and
+	// never let a mail hiccup bounce the webhook back to Stripe.
+	if (orderId) {
+		try {
+			await notifyOwners({
+				items: emailItems,
+				buyerName: customerName,
+				buyerEmail: session.customer_details?.email ?? '',
+				shippingAddress,
+				total: ((session.amount_total ?? 0) / 100).toFixed(2),
+				currency: (session.currency ?? 'usd').toUpperCase()
+			});
+		} catch (err) {
+			console.error('Failed to send new-order notification:', err);
 		}
-	} catch (err) {
-		console.error('Failed to record order in webhook:', err);
 	}
 }
 
@@ -198,27 +201,30 @@ export const POST: RequestHandler = async ({ request }) => {
 		throw error(400, 'Webhook signature verification failed');
 	}
 
-	// Handle the event
-	switch (event.type) {
-		case 'checkout.session.completed': {
-			const session = event.data.object;
-			console.log('Checkout session completed:', session.id);
-			await handleCheckoutSessionCompleted(session);
-			break;
-		}
-		case 'checkout.session.expired': {
-			const session = event.data.object;
-			console.log('Checkout session expired:', session.id);
-			// The buyer abandoned checkout — give the pieces back (only ones still reserved)
-			try {
-				await releaseReservations(db, parseArtworkIds(session));
-			} catch (err) {
-				console.error('Failed to release reservations in webhook:', err);
+	// Handle the event. DB failures become a 500 so Stripe retries — every
+	// handler is idempotent, and silently acking a lost order would strand a
+	// paid buyer with no order row.
+	try {
+		switch (event.type) {
+			case 'checkout.session.completed': {
+				const session = event.data.object;
+				console.log('Checkout session completed:', session.id);
+				await handleCheckoutSessionCompleted(session);
+				break;
 			}
-			break;
+			case 'checkout.session.expired': {
+				const session = event.data.object;
+				console.log('Checkout session expired:', session.id);
+				// The buyer abandoned checkout — give the pieces back (only ones still reserved)
+				await releaseReservations(db, parseArtworkIds(session));
+				break;
+			}
+			default:
+				console.log(`Unhandled event type: ${event.type}`);
 		}
-		default:
-			console.log(`Unhandled event type: ${event.type}`);
+	} catch (err) {
+		console.error(`Webhook handler failed for ${event.type}:`, err);
+		throw error(500, 'Webhook handler failed');
 	}
 
 	return json({ received: true });
