@@ -5,11 +5,26 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { ShoppingCart, ArrowLeft, Check } from '@lucide/svelte';
 	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 	import { cart } from '$lib/stores/cart.svelte.js';
+	import { productJsonLd, trimDescription } from '$lib/seo.js';
+	import NotifyForm from '../../Components/Notify-Form.svelte';
 
 	let { data }: { data: PageData } = $props();
 
 	let selectedImage = $state(0);
+
+	// SEO / social
+	const pageTitle = $derived(`${data.artwork.title} — Dead & Tattooed`);
+	const metaDescription = $derived(
+		trimDescription(data.artwork.description) ||
+			'A one-of-a-kind hand-tattooed, preserved specimen from Dead & Tattooed.'
+	);
+	const coverImage = $derived(data.artwork.images[0] ?? null);
+	// '<' is escaped as \u003c inside productJsonLd, so {@html} is safe here.
+	const jsonLdTag = $derived(
+		`<script type="application/ld+json">${productJsonLd(data.artwork, page.url.href)}<` + '/script>'
+	);
 
 	// Reset the gallery when navigating between pieces
 	$effect(() => {
@@ -28,6 +43,19 @@
 		});
 	}
 </script>
+
+<svelte:head>
+	<title>{pageTitle}</title>
+	<meta name="description" content={metaDescription} />
+	<meta property="og:title" content={pageTitle} />
+	<meta property="og:description" content={metaDescription} />
+	{#if coverImage}
+		<meta property="og:image" content={coverImage} />
+	{/if}
+	<meta property="og:url" content={page.url.href} />
+	<meta name="twitter:card" content="summary_large_image" />
+	{@html jsonLdTag}
+</svelte:head>
 
 <div class="container mx-auto px-4 py-8">
 	<Button variant="ghost" class="mb-6" onclick={() => goto('/products')}>
@@ -91,11 +119,16 @@
 
 			{#if data.artwork.status === 'sold'}
 				<Card.Root>
-					<Card.Content class="py-8 text-center">
-						<p class="text-lg font-medium">Sold</p>
-						<p class="text-muted-foreground mt-1">
-							This one-of-a-kind piece has found its collector.
-						</p>
+					<Card.Content class="space-y-6 py-8 text-center">
+						<div>
+							<p class="text-lg font-medium">Sold</p>
+							<p class="text-muted-foreground mt-1">
+								This one-of-a-kind piece has found its collector.
+							</p>
+						</div>
+						<div class="mx-auto flex max-w-sm flex-col items-center text-left">
+							<NotifyForm heading="This one's gone. Get first look at the next drop." />
+						</div>
 					</Card.Content>
 				</Card.Root>
 			{:else if data.artwork.status === 'reserved'}

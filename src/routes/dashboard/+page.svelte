@@ -1,13 +1,13 @@
 <script lang="ts">
-	import type { PageData } from './$types';
+	import type { PageData, ActionData } from './$types';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import ArtworkForm from './artwork-form.svelte';
 	import { enhance } from '$app/forms';
 	import { goto } from '$app/navigation';
-	import { Plus, Pencil, Trash2, ImageOff } from '@lucide/svelte';
+	import { Plus, Pencil, Trash2, ImageOff, Megaphone } from '@lucide/svelte';
 
-	let { data }: { data: PageData } = $props();
+	let { data, form }: { data: PageData; form: ActionData } = $props();
 
 	let showForm = $state(false);
 	let editingArtwork = $state<(typeof data.artworks)[0] | null>(null);
@@ -69,6 +69,24 @@
 			</Button>
 		{/if}
 	</div>
+
+	{#if form?.announced}
+		<div
+			class="rounded-lg border border-acid-green/50 bg-acid-green/10 px-4 py-3 text-sm text-acid-green"
+			role="status"
+		>
+			Announced “{form.announcedTitle}” — {form.sent} of {form.total} email{form.total === 1
+				? ''
+				: 's'} sent.
+		</div>
+	{:else if form?.error}
+		<div
+			class="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+			role="alert"
+		>
+			{form.error}
+		</div>
+	{/if}
 
 	{#if showForm}
 		<ArtworkForm
@@ -137,6 +155,36 @@
 					</div>
 
 					<div class="flex shrink-0 gap-2">
+						{#if artwork.availability === 'available'}
+							<form
+								method="POST"
+								action="?/announce"
+								use:enhance
+								onsubmit={(e) => {
+									if (
+										!confirm(
+											`Email ${data.subscriberCount} subscriber${data.subscriberCount === 1 ? '' : 's'} about "${artwork.title}"?`
+										)
+									) {
+										e.preventDefault();
+									}
+								}}
+							>
+								<input type="hidden" name="id" value={artwork.id} />
+								<Button
+									type="submit"
+									variant="outline"
+									size="sm"
+									disabled={data.subscriberCount === 0}
+									title={data.subscriberCount === 0 ? 'No subscribers yet' : undefined}
+								>
+									<Megaphone class="size-3.5" />
+									Announce to list ({data.subscriberCount} subscriber{data.subscriberCount === 1
+										? ''
+										: 's'})
+								</Button>
+							</form>
+						{/if}
 						<Button variant="outline" size="sm" onclick={() => openEditForm(artwork)}>
 							<Pencil class="size-3.5" />
 							Edit
