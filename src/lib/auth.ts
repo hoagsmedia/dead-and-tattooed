@@ -7,12 +7,30 @@ import { db } from './index';
 import { sendEmail } from './server/email';
 import { escapeHtml } from './server/html';
 
+// Every host the store is reached on. Better Auth serves /api/auth and accepts
+// callback/redirect origins ONLY for its baseURL + trustedOrigins, so a missing
+// entry here silently 404s auth on that domain (that's how login broke on the
+// vercel.app alias and again on www). Extra hosts can be added via
+// AUTH_TRUSTED_ORIGINS (comma-separated) without a code change.
+const TRUSTED_ORIGINS = [
+	'https://www.deadandtattooed.com',
+	'https://deadandtattooed.com',
+	'https://dead-and-tattooed.vercel.app',
+	'https://dev.deadandtattooed.com',
+	'http://localhost:5173',
+	...(env.AUTH_TRUSTED_ORIGINS ?? '')
+		.split(',')
+		.map((o) => o.trim())
+		.filter(Boolean)
+];
+
 export const auth = betterAuth({
 	database: drizzleAdapter(db, {
 		provider: 'pg'
 	}),
 	secret: env.BETTER_AUTH_SECRET,
 	baseURL: env.BETTER_AUTH_URL || 'http://localhost:5173',
+	trustedOrigins: TRUSTED_ORIGINS,
 	emailAndPassword: {
 		enabled: true,
 		// Block sign-in until the address is verified. Without this, anyone
