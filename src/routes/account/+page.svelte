@@ -2,6 +2,7 @@
 	import { authClient } from '$lib/auth-client';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
+	import StatusBadge from '$lib/components/status-badge.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -73,11 +74,7 @@
 							<Card.Description>Order {o.id.slice(0, 8)}</Card.Description>
 						</div>
 						<div class="flex items-center gap-3">
-							<span
-								class={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${o.status === 'completed' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground'}`}
-							>
-								{o.status}
-							</span>
+							<StatusBadge status={o.status} />
 							<span class="font-semibold">${o.total}</span>
 						</div>
 					</Card.Header>

@@ -85,6 +85,7 @@
 			<Button
 				href="https://www.instagram.com/deadandtattooed/"
 				target="_blank"
+				rel="noopener noreferrer"
 				variant="outline"
 				size="lg"
 				class="h-12 px-6 text-base"

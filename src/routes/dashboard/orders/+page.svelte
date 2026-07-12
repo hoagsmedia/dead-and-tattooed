@@ -5,6 +5,7 @@
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { enhance } from '$app/forms';
 	import { Truck, ImageOff } from '@lucide/svelte';
+	import StatusBadge from '$lib/components/status-badge.svelte';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
@@ -13,13 +14,6 @@
 	// Failed markShipped submissions: message + which order's form it belongs to.
 	const failError = $derived(form?.error ?? null);
 	const failedOrderId = $derived(form?.error ? (form.orderId ?? null) : null);
-
-	const badgeClass: Record<string, string> = {
-		pending: 'border-border bg-muted text-muted-foreground',
-		completed: 'border-acid-green/50 bg-acid-green/10 text-acid-green',
-		shipped: 'border-primary/50 bg-primary/10 text-primary',
-		cancelled: 'border-border bg-muted text-muted-foreground line-through'
-	};
 
 	const fmtDate = (d: Date | string) =>
 		new Date(d).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
@@ -62,11 +56,7 @@
 							</Card.Description>
 						</div>
 						<div class="flex items-center gap-3">
-							<span
-								class={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${badgeClass[o.status] ?? badgeClass.pending}`}
-							>
-								{o.status}
-							</span>
+							<StatusBadge status={o.status} />
 							<span class="font-semibold">{formatPrice(o.total)}</span>
 						</div>
 					</Card.Header>

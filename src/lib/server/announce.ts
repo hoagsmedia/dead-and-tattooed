@@ -3,6 +3,7 @@ import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { nanoid } from 'nanoid';
 import * as schema from '../../db/schema.js';
 import { subscriber } from '../../db/schema.js';
+import { escapeHtml } from './html.js';
 
 /**
  * "Notify me" list for new-drop announcements.
@@ -64,15 +65,6 @@ export interface DropEmail {
 	subject: string;
 	text: string;
 	html: string;
-}
-
-function escapeHtml(value: string): string {
-	return value
-		.replaceAll('&', '&amp;')
-		.replaceAll('<', '&lt;')
-		.replaceAll('>', '&gt;')
-		.replaceAll('"', '&quot;')
-		.replaceAll("'", '&#39;');
 }
 
 function formatUsd(price: string | null): string | null {
