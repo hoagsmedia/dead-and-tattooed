@@ -55,7 +55,7 @@ For local development, use Stripe CLI to forward webhooks to your local server:
 
 1. **Install Stripe CLI**: Follow instructions at https://docs.stripe.com/cli
 2. **Login**: `stripe login`
-3. **Forward webhooks**: 
+3. **Forward webhooks**:
    ```bash
    stripe listen --forward-to localhost:5173/api/stripe/webhook
    ```
@@ -65,6 +65,7 @@ For local development, use Stripe CLI to forward webhooks to your local server:
    ```
 
 The webhook endpoint will now receive events forwarded from Stripe CLI. You can trigger test events using:
+
 ```bash
 stripe trigger payment_intent.succeeded
 ```

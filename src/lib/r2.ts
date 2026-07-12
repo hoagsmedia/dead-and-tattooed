@@ -12,4 +12,3 @@ export const r2Client = new S3Client({
 });
 
 export const BUCKET_NAME = env.R2_BUCKET_NAME || 'dead-and-tattooed';
-
