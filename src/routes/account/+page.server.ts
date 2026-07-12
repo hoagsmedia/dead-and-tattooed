@@ -2,6 +2,7 @@ import { redirect } from '@sveltejs/kit';
 import { desc, eq, inArray } from 'drizzle-orm';
 import { db } from '$lib/index.js';
 import { artwork, order, orderItem } from '../../db/schema.js';
+import { trackingUrl } from '$lib/server/order-emails.js';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals }) => {
@@ -22,7 +23,10 @@ export const load: PageServerLoad = async ({ locals }) => {
 			total: order.total,
 			currency: order.currency,
 			status: order.status,
-			createdAt: order.createdAt
+			createdAt: order.createdAt,
+			shippedAt: order.shippedAt,
+			trackingNumber: order.trackingNumber,
+			carrier: order.carrier
 		})
 		.from(order)
 		.where(eq(order.customerEmail, locals.user.email))
@@ -55,6 +59,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 		verified: true as const,
 		orders: orders.map((o) => ({
 			...o,
+			trackingUrl: o.trackingNumber ? trackingUrl(o.carrier, o.trackingNumber) : null,
 			items: items
 				.filter((i) => i.orderId === o.id)
 				.map((i) => ({

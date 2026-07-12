@@ -62,12 +62,20 @@
 				Add a piece, give it photos and a story, then flip it live in the gallery.
 			</p>
 		</div>
-		{#if !showForm}
-			<Button onclick={openCreateForm}>
-				<Plus class="size-4" />
-				Add a piece
-			</Button>
-		{/if}
+		<div class="flex items-center gap-4">
+			<a
+				href="/dashboard/orders"
+				class="neon-underline text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+			>
+				Orders
+			</a>
+			{#if !showForm}
+				<Button onclick={openCreateForm}>
+					<Plus class="size-4" />
+					Add a piece
+				</Button>
+			{/if}
+		</div>
 	</div>
 
 	{#if showForm}

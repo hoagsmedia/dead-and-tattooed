@@ -6,6 +6,9 @@ import { env } from '$env/dynamic/private';
 import { db } from '$lib/index.js';
 import { artwork, order, orderItem } from '../../../../db/schema.js';
 import { markArtworksSold, releaseReservations } from '$lib/inventory.js';
+import { adminEmails } from '$lib/server/admin.js';
+import { sendEmail } from '$lib/server/email.js';
+import { buildNewOrderEmail, type OrderEmailItem } from '$lib/server/order-emails.js';
 import { inArray } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 
@@ -38,6 +41,34 @@ function addressToJson(address: Stripe.Address | null | undefined): string {
 		state: address?.state ?? '',
 		zip: address?.postal_code ?? '',
 		country: address?.country ?? ''
+	});
+}
+
+/**
+ * Tell the artist a piece sold. Best-effort: failures are logged per address
+ * and never propagate (the webhook must ack Stripe regardless).
+ */
+async function notifyOwners(
+	orderDetails: Omit<Parameters<typeof buildNewOrderEmail>[0], 'ordersUrl'>
+): Promise<void> {
+	const recipients = adminEmails();
+	if (recipients.length === 0) {
+		console.warn('ADMIN_EMAILS is empty — skipping new-order notification');
+		return;
+	}
+
+	const baseUrl = (env.BETTER_AUTH_URL || 'https://deadandtattooed.com').replace(/\/$/, '');
+	const email = buildNewOrderEmail({ ...orderDetails, ordersUrl: `${baseUrl}/dashboard/orders` });
+
+	const results = await Promise.allSettled(
+		recipients.map((to) =>
+			sendEmail({ to, subject: email.subject, text: email.text, html: email.html })
+		)
+	);
+	results.forEach((result, i) => {
+		if (result.status === 'rejected') {
+			console.error(`Failed to email new-order notification to ${recipients[i]}:`, result.reason);
+		}
 	});
 }
 
@@ -86,6 +117,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session):
 			.returning({ id: order.id });
 
 		const orderId = inserted[0]?.id;
+		const emailItems: OrderEmailItem[] = [];
 
 		if (orderId && artworkIds.length > 0) {
 			const pieces = await db.select().from(artwork).where(inArray(artwork.id, artworkIds));
@@ -94,14 +126,17 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session):
 			await db.insert(orderItem).values(
 				artworkIds.map((artworkId) => {
 					const piece = piecesById.get(artworkId);
+					const name = piece?.title ?? 'Artwork';
+					const price = piece?.price ?? '0';
+					emailItems.push({ name, price });
 					return {
 						id: nanoid(),
 						orderId,
 						productId: artworkId,
 						priceId: 'inline',
 						artworkId,
-						name: piece?.title ?? 'Artwork',
-						price: piece?.price ?? '0',
+						name,
+						price,
 						currency: (session.currency ?? 'usd').toUpperCase()
 					};
 				})
@@ -109,6 +144,23 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session):
 		}
 
 		console.log('Order recorded for checkout session:', session.id);
+
+		// Only on first insert (orderId is undefined on webhook retries), and
+		// never let a mail hiccup bounce the webhook back to Stripe.
+		if (orderId) {
+			try {
+				await notifyOwners({
+					items: emailItems,
+					buyerName: customerName,
+					buyerEmail: session.customer_details?.email ?? '',
+					shippingAddress,
+					total: ((session.amount_total ?? 0) / 100).toFixed(2),
+					currency: (session.currency ?? 'usd').toUpperCase()
+				});
+			} catch (err) {
+				console.error('Failed to send new-order notification:', err);
+			}
+		}
 	} catch (err) {
 		console.error('Failed to record order in webhook:', err);
 	}

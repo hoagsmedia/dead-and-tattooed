@@ -10,9 +10,13 @@ import { env } from '$env/dynamic/private';
  */
 export function isAdmin(email: string | null | undefined): boolean {
 	if (!email) return false;
-	const allowlist = (env.ADMIN_EMAILS ?? '')
+	return adminEmails().includes(email.toLowerCase());
+}
+
+/** The parsed ADMIN_EMAILS allowlist (trimmed, lowercased, empties dropped). */
+export function adminEmails(): string[] {
+	return (env.ADMIN_EMAILS ?? '')
 		.split(',')
 		.map((entry) => entry.trim().toLowerCase())
 		.filter(Boolean);
-	return allowlist.includes(email.toLowerCase());
 }

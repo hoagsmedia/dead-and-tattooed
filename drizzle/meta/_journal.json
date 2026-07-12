@@ -36,6 +36,13 @@
       "when": 1783822996960,
       "tag": "0004_fulfillment_and_subscribers",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1783823292926,
+      "tag": "0005_fulfillment_columns",
+      "breakpoints": true
     }
   ]
 }
