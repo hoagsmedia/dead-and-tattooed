@@ -46,4 +46,7 @@
 		<Form.FieldErrors />
 	</Form.Field>
 	<Form.Button>Sign In</Form.Button>
+	<p class="text-sm text-muted-foreground">
+		<a href="/auth/forgot" class="underline underline-offset-4">Forgot your password?</a>
+	</p>
 </form>
