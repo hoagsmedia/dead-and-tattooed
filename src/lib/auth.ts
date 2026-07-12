@@ -23,6 +23,21 @@ export const auth = betterAuth({
 			});
 		}
 	},
+	emailVerification: {
+		// Verified email is the gate for /account order history (orders are
+		// matched by email; without verification anyone could sign up with a
+		// buyer's address and read their orders + shipping info).
+		sendOnSignUp: true,
+		autoSignInAfterVerification: true,
+		sendVerificationEmail: async ({ user, url }) => {
+			await sendEmail({
+				to: user.email,
+				subject: 'Verify your Dead & Tattooed email',
+				text: `Confirm this address to activate your account: ${url}\n\nIf you didn't create an account, ignore this.`,
+				html: `<p>Confirm this address to activate your Dead &amp; Tattooed account:</p><p><a href="${url}">Verify email</a></p><p>If you didn't create an account, ignore this.</p>`
+			});
+		}
+	},
 	// Uncomment and configure social providers when ready:
 	// socialProviders: {
 	// 	github: {

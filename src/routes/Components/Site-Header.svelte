@@ -8,6 +8,7 @@
 	import { ShoppingCart } from '@lucide/svelte';
 	import CartSheet from '$lib/components/cart-sheet.svelte';
 
+	let { admin = false }: { admin?: boolean } = $props();
 	const session = authClient.useSession();
 
 	let cartSheetOpen = $state(false);
@@ -56,12 +57,21 @@
 				</a>
 				{#if $session.data?.user}
 					<a
-						href="/dashboard"
-						aria-current={isCurrent('/dashboard')}
+						href="/account"
+						aria-current={isCurrent('/account')}
 						class="neon-underline text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
 					>
-						Dashboard
+						Orders
 					</a>
+					{#if admin}
+						<a
+							href="/dashboard"
+							aria-current={isCurrent('/dashboard')}
+							class="neon-underline text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+						>
+							Dashboard
+						</a>
+					{/if}
 				{/if}
 			</nav>
 		</div>
@@ -120,12 +130,21 @@
 		</a>
 		{#if $session.data?.user}
 			<a
-				href="/dashboard"
-				aria-current={isCurrent('/dashboard')}
+				href="/account"
+				aria-current={isCurrent('/account')}
 				class="neon-underline text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
 			>
-				Dashboard
+				Orders
 			</a>
+			{#if admin}
+				<a
+					href="/dashboard"
+					aria-current={isCurrent('/dashboard')}
+					class="neon-underline text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+				>
+					Dashboard
+				</a>
+			{/if}
 		{/if}
 	</nav>
 </header>
