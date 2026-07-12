@@ -16,6 +16,7 @@ use cloudflare r2 for image storage [https://developers.cloudflare.com/developer
 3. **(GLM) Stripe TEST-mode e2e smoke** — with real test keys + `stripe listen` (see STRIPE_LOCAL_SETUP.md): full buy flow incl. oversell 409 (second buyer of the same piece), session expiry → hold release, webhook sold-marking. Automate what's possible in Playwright with STRIPE mock/test-clock, document the manual rest.
 4. **(GLM) Owner order-notification email** — on `checkout.session.completed`, email the artist (Resend free tier or SMTP env) with piece/buyer/shipping. Buyer receipts already come from Stripe — do NOT build buyer email.
 5. **(either) /info real copy** — shipping/returns/contact is placeholder-honest; write the real policy with Josh.
-6. **(either) Old `src/lib/components/navbar.svelte`** is unused after the new Site-Header — delete it.
+6. **(codex, BEFORE 2026-10-01) Node 24 upgrade** — Vercel deprecates Node 20 builds in October, but `@sveltejs/adapter-auto@3` refuses Node >20. Upgrade to current `@sveltejs/adapter-vercel` (or adapter-auto >=4), verify build, then set the Vercel project nodeVersion to 24.x (it's pinned to 20.x today for exactly this reason).
+7. **(either) Old `src/lib/components/navbar.svelte`** is unused after the new Site-Header — delete it.
 
 Conventions: match existing code style; never share a checkout (worktrees); gates = check (Δ0 vs baseline) + vitest green + prettier on your files.
