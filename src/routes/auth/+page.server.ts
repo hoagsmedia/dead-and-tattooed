@@ -19,8 +19,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 		signInForm: await superValidate(
 			zod4(signInSchema, {
 				defaults: {
-					email: 'mrjoshhoagland@gmail.com',
-					password: 'password',
+					email: '',
+					password: '',
 					rememberMe: true
 				}
 			})
@@ -56,12 +56,17 @@ export const actions: Actions = {
 				throw error;
 			}
 
+			// requireEmailVerification: an unverified account gets a fresh
+			// verification email on every sign-in attempt — tell them to look.
+			const unverified = error instanceof Error && /verif/i.test(error.message);
 			return fail(400, {
 				signInForm: {
 					...form,
 					errors: {
 						...form.errors,
-						_password: ['Invalid email or password']
+						...(unverified
+							? { email: ['Verify your email first — we just sent you a new link.'] }
+							: { password: ['Invalid email or password'] })
 					}
 				}
 			});
@@ -87,7 +92,9 @@ export const actions: Actions = {
 				headers: event.request.headers
 			});
 
-			throw redirect(302, '/dashboard');
+			// requireEmailVerification: no session yet — the account activates
+			// via the link we just emailed.
+			return { signUpForm: form, verificationSent: true };
 		} catch (error) {
 			// Re-throw redirects
 			if (isRedirect(error)) {
@@ -99,7 +106,7 @@ export const actions: Actions = {
 					...form,
 					errors: {
 						...form.errors,
-						_email: [error instanceof Error ? error.message : 'Sign up failed']
+						email: [error instanceof Error ? error.message : 'Sign up failed']
 					}
 				}
 			});

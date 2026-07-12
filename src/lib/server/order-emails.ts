@@ -4,6 +4,8 @@
  * Actual sending happens at the call sites via `sendEmail` in ./email.ts.
  */
 
+import { escapeHtml } from './html.js';
+
 export type OrderEmailItem = {
 	name: string;
 	/** Numeric string, e.g. "120.00" (matches the numeric columns). */
@@ -32,15 +34,6 @@ export type ShippedEmailInput = {
 };
 
 export type BuiltEmail = { subject: string; text: string; html: string };
-
-function escapeHtml(value: string): string {
-	return value
-		.replaceAll('&', '&amp;')
-		.replaceAll('<', '&lt;')
-		.replaceAll('>', '&gt;')
-		.replaceAll('"', '&quot;')
-		.replaceAll("'", '&#39;');
-}
 
 function formatMoney(amount: string, currency?: string): string {
 	const n = Number(amount);

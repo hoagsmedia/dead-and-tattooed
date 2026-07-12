@@ -1,8 +1,8 @@
-import { fail, redirect } from '@sveltejs/kit';
+import { fail } from '@sveltejs/kit';
 import { desc, eq, inArray } from 'drizzle-orm';
 import { db } from '$lib/index.js';
 import { artwork, order, orderItem } from '../../../db/schema.js';
-import { isAdmin } from '$lib/server/admin';
+import { requireAdmin } from '$lib/server/admin';
 import { sendEmail } from '$lib/server/email';
 import { buildShippedEmail, shippingAddressLines, trackingUrl } from '$lib/server/order-emails';
 import type { PageServerLoad, Actions } from './$types';
@@ -10,14 +10,9 @@ import type { PageServerLoad, Actions } from './$types';
 // The dashboard layout already gates on ADMIN_EMAILS, but layout loads don't
 // run for form actions (and page loads can run in parallel with them), so
 // both load and action re-check on their own.
-function assertAdmin(locals: App.Locals): void {
-	if (!locals.user || !isAdmin(locals.user.email)) {
-		throw redirect(302, '/auth');
-	}
-}
 
 export const load: PageServerLoad = async ({ locals }) => {
-	assertAdmin(locals);
+	requireAdmin(locals);
 
 	const orders = await db.select().from(order).orderBy(desc(order.createdAt));
 
@@ -72,7 +67,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 export const actions: Actions = {
 	markShipped: async ({ request, locals }) => {
-		assertAdmin(locals);
+		requireAdmin(locals);
 
 		const formData = await request.formData();
 		const orderId = formData.get('orderId')?.toString();

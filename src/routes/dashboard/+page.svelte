@@ -3,6 +3,7 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import ArtworkForm from './artwork-form.svelte';
+	import StatusBadge from '$lib/components/status-badge.svelte';
 	import { enhance } from '$app/forms';
 	import { goto } from '$app/navigation';
 	import { Plus, Pencil, Trash2, ImageOff, Megaphone } from '@lucide/svelte';
@@ -27,20 +28,6 @@
 		editingArtwork = null;
 		goto('/dashboard', { invalidateAll: true });
 	}
-
-	const badgeClass: Record<string, string> = {
-		available: 'border-acid-green/50 bg-acid-green/10 text-acid-green',
-		reserved: 'border-neon-purple/60 bg-neon-purple/15 text-neon-lavender',
-		sold: 'border-ink-yellow bg-ink-yellow text-background',
-		draft: 'border-border bg-muted text-muted-foreground'
-	};
-
-	const badgeLabel: Record<string, string> = {
-		available: 'Available',
-		reserved: 'Reserved',
-		sold: 'Sold',
-		draft: 'Draft'
-	};
 
 	function formatPrice(price: string | null): string {
 		if (!price) return '—';
@@ -140,13 +127,7 @@
 					<div class="min-w-0 flex-1 space-y-1">
 						<div class="flex flex-wrap items-center gap-2">
 							<h2 class="truncate font-semibold">{artwork.title}</h2>
-							<span
-								class="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-bold uppercase tracking-wide {badgeClass[
-									artwork.availability
-								] ?? badgeClass.draft}"
-							>
-								{badgeLabel[artwork.availability] ?? artwork.availability}
-							</span>
+							<StatusBadge status={artwork.availability} />
 							{#if artwork.published && artwork.availability !== 'sold'}
 								<span class="text-xs text-muted-foreground">Live in gallery</span>
 							{/if}
