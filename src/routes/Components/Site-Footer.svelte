@@ -71,6 +71,16 @@
 							Contact
 						</a>
 					</li>
+					<li>
+						<a href="/privacy" class="text-muted-foreground transition-colors hover:text-neon-teal">
+							Privacy
+						</a>
+					</li>
+					<li>
+						<a href="/terms" class="text-muted-foreground transition-colors hover:text-neon-teal">
+							Terms
+						</a>
+					</li>
 				</ul>
 			</div>
 			<div class="space-y-2">
