@@ -52,7 +52,15 @@
 						<div>
 							<Card.Title class="text-base">{fmtDate(o.createdAt)}</Card.Title>
 							<Card.Description>
-								Order {o.id.slice(0, 8)} · {o.buyerName} &lt;{o.buyerEmail}&gt;
+								Order {o.id.slice(0, 8)} · {o.buyerName} &lt;{o.buyerEmail}&gt; ·
+								<a
+									href={`https://dashboard.stripe.com/payments/${o.paymentIntentId}`}
+									target="_blank"
+									rel="noopener noreferrer"
+									class="underline underline-offset-4 hover:text-foreground"
+								>
+									Stripe payment
+								</a>
 							</Card.Description>
 						</div>
 						<div class="flex items-center gap-3">

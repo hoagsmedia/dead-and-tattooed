@@ -14,7 +14,7 @@ import type { PageServerLoad, Actions } from './$types';
 export const load: PageServerLoad = async ({ locals }) => {
 	requireAdmin(locals);
 
-	const orders = await db.select().from(order).orderBy(desc(order.createdAt));
+	const orders = await db.select().from(order).orderBy(desc(order.createdAt)).limit(100);
 
 	const orderIds = orders.map((o) => o.id);
 	const items = orderIds.length
@@ -42,6 +42,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 	return {
 		orders: orders.map((o) => ({
 			id: o.id,
+			paymentIntentId: o.paymentIntentId,
 			buyerName: o.customerName,
 			buyerEmail: o.customerEmail,
 			addressLines: shippingAddressLines(o.shippingAddress),
