@@ -17,11 +17,30 @@
 </script>
 
 <svelte:head>
+	<!-- Site-wide defaults. Page-level <svelte:head> tags override these (SvelteKit
+	     dedupes meta by name/property and the deeper component wins; the homepage
+	     and content pages set their own title/description where it matters). -->
+	<title>Dead &amp; Tattooed — one-of-a-kind tattooed specimens in jars</title>
+	<meta
+		name="description"
+		content="Hand-tattooed, preserved specimens sealed in glass jars. Every piece is a one-of-one original from a tattoo artist who takes dead things very seriously. Ships within the US."
+	/>
 	<meta property="og:site_name" content="Dead & Tattooed" />
 	<meta property="og:type" content="website" />
+	<meta property="og:title" content="Dead & Tattooed — one-of-a-kind tattooed specimens" />
+	<meta
+		property="og:description"
+		content="Hand-tattooed, preserved specimens sealed in glass. Every piece is a one-of-one — when it's gone, it's gone."
+	/>
 	{#if !isProductDetail}
 		<meta property="og:image" content={ogImage} />
 		<meta name="twitter:card" content="summary_large_image" />
+		<meta name="twitter:title" content="Dead & Tattooed — one-of-a-kind tattooed specimens" />
+		<meta
+			name="twitter:description"
+			content="Hand-tattooed, preserved specimens sealed in glass. Every piece is a one-of-one — when it's gone, it's gone."
+		/>
+		<meta name="twitter:image" content={ogImage} />
 	{/if}
 </svelte:head>
 
